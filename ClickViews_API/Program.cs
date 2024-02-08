@@ -13,10 +13,21 @@ builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 var dbService = new DbService(builder.Configuration);
 builder.Services.AddSingleton(dbService);
 
-var userService = new UserService(builder.Configuration, dbService);
+var userService = new UserService(dbService);
 builder.Services.AddSingleton(userService);
 
-builder.Services.AddAuthentication().AddBearerToken();
+// read token expiration from configuration
+var config = builder.Configuration.GetSection("BearerToken");
+TimeSpan expireHours = config["ExpireHours"] != null ?
+    TimeSpan.FromHours(Convert.ToDouble(config["ExpireHours"])) : TimeSpan.FromHours(24);
+
+// add authentication and authorization
+builder.Services.AddAuthentication().AddBearerToken(config =>
+{
+    config.BearerTokenExpiration = expireHours;
+    config.ClaimsIssuer = "ClickViews_API";
+});
+
 builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();

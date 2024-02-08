@@ -1,7 +1,4 @@
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using System.Security.Claims;
-using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 
 namespace ClickViews_API.Services
@@ -11,76 +8,14 @@ namespace ClickViews_API.Services
      */
     public class UserService
     {
-        private readonly IConfiguration _configuration;
         private readonly DbService _dbService;
-        private readonly string _key;
 
         /**
         * This is the constructor for the UserService class
         */
-        public UserService(IConfiguration configuration, DbService dbService)
+        public UserService(DbService dbService)
         {
-            _configuration = configuration;
             _dbService = dbService;
-            _key = _configuration["Jwt:Key"] ?? throw new NullReferenceException("Jwt:Key");
-        }
-
-        /**
-        * This method is used to generate a token
-        * @param username The username of the user
-        * @return The token
-        */
-        public string GenerateToken(string username)
-        {
-            var key = Encoding.ASCII.GetBytes(_key!);
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username) }),
-                Expires = DateTime.UtcNow.AddHours(1),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-            };
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
-        }
-
-        /**
-        * This method is used to validate a token
-        * @param token The token
-        * @return True if the token is valid, otherwise false
-        */
-        public bool ValidateToken(string token)
-        {
-            var key = Encoding.ASCII.GetBytes(_key);
-            var tokenHandler = new JwtSecurityTokenHandler();
-            try
-            {
-                tokenHandler.ValidateToken(token, new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ClockSkew = TimeSpan.Zero
-                }, out SecurityToken validatedToken);
-            }
-            catch
-            {
-                return false;
-            }
-            return true;
-        }
-
-        /**
-        * This method is used to get the username from a token
-        * @param token The token
-        * @return The username of the user
-        */
-        public string GetUsernameFromToken(string token)
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var securityToken = tokenHandler.ReadToken(token) as JwtSecurityToken ?? throw new Exception("Invalid token");
-            return securityToken.Subject;
         }
 
         /**
