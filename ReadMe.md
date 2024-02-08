@@ -1,10 +1,9 @@
 # ClickViews API
 
-This is the readme file for the ClickViews API application.
-
 ## Description
 
-ClickViews API is a middleware application that acts as a bridge between the ClickViews database and other applications. It is developed using .NET 8 and provides a RESTful interface for querying the database. This API enables seamless integration and interaction with the ClickViews database, allowing authenticated users to retrieve data and perform various operations. 
+ClickViews API is a middleware application that acts as a bridge between the ClickViews database and other applications. It is developed using .NET 8 and provides a RESTful interface for querying the database. This API enables seamless integration and interaction with the ClickViews database, allowing authenticated users to retrieve data and perform various operations.
+Please note that this API is not feature complete and still in development.
 
 ## Installation
 
@@ -15,7 +14,7 @@ To install and run the ClickViews_API application, follow these steps:
 3. Install dependencies: `dotnet restore`
 4. Build the project: `dotnet build`
 5. Edit the configuration file `appsettings.json` to configure your ClickHouse server address, port, user and default database.
-6. Execute `dotnet user-secrets init` and `dotnet user-secrets set "ClickHouse:Password" [YourClickHousePassword]`
+6. Execute `dotnet user-secrets init` and `dotnet user-secrets set "ClickHouse:Password" [YourClickHousePassword]`.
 7. Run the application: `dotnet run`
 
 ## Usage
