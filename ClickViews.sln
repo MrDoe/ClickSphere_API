@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34310.174
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClickViews_API", "ClickViews_API\ClickViews_API.csproj", "{CFFE5C99-E991-4A5C-A531-FB3B51DA21F4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Octonica.ClickHouseClient", "..\ClickHouseClient\src\Octonica.ClickHouseClient\Octonica.ClickHouseClient.csproj", "{9C13D6FA-AF70-451B-94B9-B697F48F7DB9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CFFE5C99-E991-4A5C-A531-FB3B51DA21F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFFE5C99-E991-4A5C-A531-FB3B51DA21F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFFE5C99-E991-4A5C-A531-FB3B51DA21F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFFE5C99-E991-4A5C-A531-FB3B51DA21F4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C13D6FA-AF70-451B-94B9-B697F48F7DB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C13D6FA-AF70-451B-94B9-B697F48F7DB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C13D6FA-AF70-451B-94B9-B697F48F7DB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C13D6FA-AF70-451B-94B9-B697F48F7DB9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C9864DD4-CB2A-474C-85D3-DA0ACAB76843}
+	EndGlobalSection
+EndGlobal
