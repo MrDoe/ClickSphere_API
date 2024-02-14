@@ -1,8 +1,8 @@
 namespace ClickViews_API.Models
 {
-    public class UserModel
+    public class LoginModel
     {
-        public required string Username { get; set; }
+        public required string UserName { get; set; }
         public required string Password { get; set; }
     }
 }

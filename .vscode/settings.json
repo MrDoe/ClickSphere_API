@@ -1,0 +1,5 @@
+{
+    "github.copilot.chat.localeOverride": "en",
+    "github.copilot.editor.enableCodeActions": true,
+    "github.copilot.chat.welcomeMessage": "never"
+}

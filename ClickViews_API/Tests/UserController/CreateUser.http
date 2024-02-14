@@ -1,3 +1,8 @@
-GET http://localhost:5281/getRows?database=default&table=Patienten&limit=100 HTTP/1.1
-Authorization: Bearer CfDJ8KkI2x9pSWNDpSOUrcmK-fao5_BWeX7v9LBxzRQWseTV7eSGPqL7rMPx-toJ22JN-IgsXZdJqxmB1hzgADtdKM9u66iBFCYezNdY7mJu8p8NZmfeDw6UwwR8M6tH809-w6eW7LFYEufrpgJpzD4MTNxkS9AeKJzX2AU038xZkuNONY5qyAIMEJqwcfL9B4NT_AFA2cUh9WOHImf2hERqI_k9hSrJ7M1NUgUvPALDsY9sw796aAvSDAPuPgZZHx1-ZKI38EvdIwKFxWe0dR6ty6I
+POST http://localhost:5281/createUser HTTP/1.1
 Content-Type: application/json
+Authorization: Bearer CfDJ8KkI2x9pSWNDpSOUrcmK-fao5_BWeX7v9LBxzRQWseTV7eSGPqL7rMPx-toJ22JN-IgsXZdJqxmB1hzgADtdKM9u66iBFCYezNdY7mJu8p8NZmfeDw6UwwR8M6tH809-w6eW7LFYEufrpgJpzD4MTNxkS9AeKJzX2AU038xZkuNONY5qyAIMEJqwcfL9B4NT_AFA2cUh9WOHImf2hERqI_k9hSrJ7M1NUgUvPALDsY9sw796aAvSDAPuPgZZHx1-ZKI38EvdIwKFxWe0dR6ty6I
+
+{
+    "UserName": "christoph",
+    "Password": "123456"
+}

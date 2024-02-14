@@ -6,27 +6,37 @@ namespace ClickViews_API.Services
      * This class is used to create a connection to the ClickHouse database
      * and to execute queries on the database
      */
-    public class DbService()
+    public class DbService : IDbService
     {
         private readonly ClickHouseConnectionStringBuilder? _connString;
+        private string Host { get; set; }
+        private ushort Port { get; set; }
 
         /**
          * This is the constructor for the DbService class
          */
-        public DbService(IConfiguration configuration) : this()
+        public DbService(IConfiguration configuration)
         {
             // check required config values
             if (configuration["ClickHouse:Host"] == null)
                 throw new ArgumentNullException(nameof(configuration), "ClickHouse:Host");
+            else
+                Host = configuration["ClickHouse:Host"]!;
+
             if (configuration["ClickHouse:Port"] == null)
                 throw new ArgumentNullException(nameof(configuration), "ClickHouse:Port");
+            else
+                Port = ushort.TryParse(configuration["ClickHouse:Port"], out var port) ? port : 
+                throw new Exception("ClickHouse:Port is not a valid port number");
+            
             if (configuration["ClickHouse:User"] == null)
                 throw new ArgumentNullException(nameof(configuration), "ClickHouse:User");
 
+
             _connString = new ClickHouseConnectionStringBuilder
             {
-                Host = configuration["ClickHouse:Host"],
-                Port = Convert.ToUInt16(configuration["ClickHouse:Port"]),
+                Host = Host,
+                Port = Port,
                 User = configuration["ClickHouse:User"]!,
                 Password = configuration["ClickHouse:Password"],
                 Database = configuration["ClickHouse:Database"]
@@ -43,6 +53,32 @@ namespace ClickViews_API.Services
                 throw new Exception("ClickHouse connection string is not valid");
             
             return new ClickHouseConnection(_connString.ConnectionString);
+        }
+
+        /**
+        * This method is used to check if the login credentials are valid
+        * @param user The username of the user
+        * @param password The password of the user
+        */
+        public async Task<bool> CheckLogin(string user, string password)
+        {
+            try
+            {
+                var connectionString = $"Host={Host};Port={Port};User={user};Password={password};";
+                
+                using var connection = new ClickHouseConnection(connectionString);
+                await connection.OpenAsync();  // Try to open a connection
+                
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT 1";  // Try to execute a simple query
+                await command.ExecuteScalarAsync();
+                
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         /**

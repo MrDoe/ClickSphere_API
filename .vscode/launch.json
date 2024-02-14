@@ -13,6 +13,11 @@
             "args": [],
             "cwd": "${workspaceFolder}/ClickViews_API",
             "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(http?://\\S+)",
+                "uriFormat": "%s/swagger/index.html"
+             },
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development",
                 "ASPNETCORE_URLS": "http://localhost:5281"
