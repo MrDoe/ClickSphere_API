@@ -23,13 +23,21 @@ namespace ClickViews_API.Controllers
         [Authorize]
         [HttpPost]
         [Route("/createView")]
-        public async Task<IResult> CreateView(CreateViewRequest request)
+        public async Task<IResult> CreateView(CreateViewRequest view)
         {
-            string query = $"CREATE VIEW {request.Database}.{request.View} AS {request.Query};";
+            string query = $"CREATE VIEW {view.Database}.{view.Id} AS {view.Query};";
             int result = await _dbService.ExecuteNonQuery(query);
             
+            // insert view into CV_Views table
             if (result == 0)
-                return Results.Ok();
+            {
+                string insertQuery = $"INSERT INTO CV_Views (ID, Name, Description) VALUES ('{view.Id}', '{view.Name}', '{view.Description}');";
+                int insertResult = await _dbService.ExecuteNonQuery(insertQuery);
+                if (insertResult < 0)
+                    return Results.BadRequest("Could not insert view into CV_Views table");
+                else
+                    return Results.Ok();
+            }
             else
                 return Results.BadRequest("Could not create view");
         }
@@ -47,7 +55,13 @@ namespace ClickViews_API.Controllers
         {
             int result = await _dbService.ExecuteNonQuery($"DROP VIEW {database}.{view}");
             if (result == 0)
-                return Results.Ok();
+               {
+                    result = await _dbService.ExecuteNonQuery($"DELETE FROM CV_Views WHERE ID = '{view}'");
+                    if (result == 0)
+                        return Results.Ok();
+                    else
+                        return Results.BadRequest("Could not delete view from CV_Views table");
+               }
             else
                 return Results.BadRequest("Could not drop view");
         }

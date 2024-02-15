@@ -3,9 +3,9 @@ Authorization: Bearer CfDJ8KkI2x9pSWNDpSOUrcmK-fao5_BWeX7v9LBxzRQWseTV7eSGPqL7rM
 Content-Type: application/json
 
 {
-    "Database": "default",
-    "Table": "Roles",
-    "Columns": "RoleId UUID, RoleName String",
-    "Engine": "TinyLog",
-    "OrderBy": ""
+  "database": "default",
+  "table": "CV_Views",
+  "columns": "ID String, Name String, Description String",
+  "engine": "MergeTree",
+  "orderBy": "ID"
 }

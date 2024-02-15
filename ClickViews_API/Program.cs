@@ -16,7 +16,7 @@ builder.Services.AddSwaggerGen(c =>
         Name = "Bearer",
         BearerFormat = "JWT",
         Scheme = "bearer",
-        Description = "Specify the bearer token in the following format: 'Bearer {token}'",
+        Description = "Specify the bearer token: {token}",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.Http,
     };
@@ -34,7 +34,7 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "BearerAuth"
                 }
             },
-            new string[] {}
+            Array.Empty<string>()
         }
     });
 });

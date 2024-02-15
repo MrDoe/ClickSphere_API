@@ -71,17 +71,17 @@ namespace ClickViews_API.Controllers
             return await _dbService.ExecuteQuery($"SHOW TABLES FROM {database}");
         }
 
-                /**
-        * Get the views of a database
+        /**
+        * Get the views of a database which are registered in ClickViews
         * @param database The database to get the views from
         * @return The views of the database
         */
         [Authorize]
         [HttpGet]
         [Route("/getViews")]
-        public async Task<IEnumerable<string>> GetViews(string database)
+        public async Task<IEnumerable<Dictionary<string, object>>> GetViews(string database)
         {
-           return await _dbService.ExecuteQuery($"SELECT name FROM system.tables where database = '{database}' and engine = 'View'");
+           return await _dbService.ExecuteQueryDictionary($"SELECT c.* FROM system.tables s join CV_Views c on c.ID = s.name where s.database = '{database}' and s.engine = 'View'");
         }
     }
 }
