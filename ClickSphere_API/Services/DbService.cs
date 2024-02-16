@@ -1,6 +1,6 @@
 using Octonica.ClickHouseClient;
 
-namespace ClickViews_API.Services
+namespace ClickSphere_API.Services
 {
     /**
      * This class is used to create a connection to the ClickHouse database
@@ -41,6 +41,8 @@ namespace ClickViews_API.Services
                 Password = configuration["ClickHouse:Password"],
                 Database = configuration["ClickHouse:Database"]
             } ?? throw new Exception("ClickHouse connection string is not valid");
+
+            InitializeDatabase().Wait();
         }
 
         /**
@@ -148,6 +150,24 @@ namespace ClickViews_API.Services
             var command = connection.CreateCommand(query);
             var result = await command.ExecuteScalarAsync();
             return result ?? DBNull.Value;
+        }
+
+        /**
+        * This method is used to initialize the database
+        */
+        public async Task InitializeDatabase()
+        {
+            // create the database if it does not exist
+            string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
+            await ExecuteNonQuery(query);
+            
+            // create the users table if it does not exist
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.User (Id String, LDAP_User String, FirstName String, LastName String, Phone String, Department String) ENGINE = TinyLog";
+            await ExecuteNonQuery(query);
+
+            // create the views table if it does not exist
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.View (Id String, Name String, Description String) ENGINE = TinyLog";
+            await ExecuteNonQuery(query);
         }
     }
 }

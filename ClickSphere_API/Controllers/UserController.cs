@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ClickViews_API.Models;
-using ClickViews_API.Services;
+using ClickSphere_API.Models;
+using ClickSphere_API.Services;
 
-namespace ClickViews_API.Controllers
+namespace ClickSphere_API.Controllers
 {
     /**
-     * The base class for ClickViews API controllers.
+     * The base class for ClickSphere API controllers.
      */
     [ApiController]
     public class UserController(IUserService userService) : ControllerBase
@@ -21,7 +21,7 @@ namespace ClickViews_API.Controllers
         [AllowAnonymous]
         [HttpPost]
         [Route("/login")]
-        public async Task<IResult> Login([FromBody] LoginModel user)
+        public async Task<IResult> Login([FromBody] LoginRequest user)
         {
             if (user == null)
                 return Results.BadRequest("User is required");
@@ -44,7 +44,7 @@ namespace ClickViews_API.Controllers
         [Authorize]
         [HttpPost]
         [Route("/createUser")]
-        public async Task<IResult> CreateUser([FromBody] LoginModel user)
+        public async Task<IResult> CreateUser([FromBody] LoginRequest user)
         {
             if (user == null)
                 return Results.BadRequest("User is required");
@@ -67,7 +67,7 @@ namespace ClickViews_API.Controllers
         [Authorize]
         [HttpDelete]
         [Route("/deleteUser")]
-        public async Task<IResult> DeleteUser([FromBody] LoginModel user)
+        public async Task<IResult> DeleteUser([FromBody] LoginRequest user)
         {
             if (user == null)
                 return Results.BadRequest("User is required");
@@ -89,7 +89,7 @@ namespace ClickViews_API.Controllers
         [Authorize]
         [HttpGet]
         [Route("/getUsers")]
-        public async Task<IEnumerable<User>> GetUsers()
+        public async Task<IEnumerable<CreatUserRequest>> GetUsers()
         {
             return await _userService.GetUsers();
         }
@@ -141,5 +141,19 @@ namespace ClickViews_API.Controllers
             else
                 return Results.BadRequest("Could not assign role: User or role does not exist.");
         }
+
+        /**
+        * Get user configuration from ClickSphere.users
+        * @param userName The user name of the user
+        * @return The user configuration
+        */
+        [Authorize]
+        [HttpGet]
+        [Route("/getUserConfig")]
+        public async Task<UserConfig> GetUserConfig(string userName)
+        {
+            return await _userService.GetUserConfig(userName);
+        }
+
     }
 }

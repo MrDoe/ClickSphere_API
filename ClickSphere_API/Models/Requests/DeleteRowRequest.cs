@@ -1,4 +1,4 @@
-namespace ClickViews_API
+namespace ClickSphere_API
 {
     public class DeleteRowRequest
     {

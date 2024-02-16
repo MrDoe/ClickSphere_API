@@ -9,9 +9,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/ClickViews_API/bin/Debug/net8.0/ClickViews_API.dll",
+            "program": "${workspaceFolder}/ClickSphere_API/bin/Debug/net8.0/ClickSphere_API.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/ClickViews_API",
+            "cwd": "${workspaceFolder}/ClickSphere_API",
             "stopAtEntry": false,
             "serverReadyAction": {
                 "action": "openExternally",

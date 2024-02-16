@@ -1,4 +1,4 @@
-using ClickViews_API.Services;
+using ClickSphere_API.Services;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -57,7 +57,7 @@ else
 builder.Services.AddAuthentication().AddBearerToken(config =>
 {
     config.BearerTokenExpiration = expireHours;
-    config.ClaimsIssuer = "ClickViews_API";
+    config.ClaimsIssuer = "ClickSphere_API";
 });
 
 builder.Services.AddAuthorization();
@@ -71,7 +71,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ClickViews API V1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ClickSphere API V1");
     });
 }
 

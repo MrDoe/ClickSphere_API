@@ -1,13 +1,13 @@
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ClickViews_API.Services;
-using ClickViews_API.Models;
+using ClickSphere_API.Services;
+using ClickSphere_API.Models;
 
-namespace ClickViews_API.Controllers
+namespace ClickSphere_API.Controllers
 {
     /**
-     * The base class for ClickViews API controllers.
+     * The base class for ClickSphere API controllers.
      */
     [ApiController]
     public class TableController(IDbService dbService) : ControllerBase

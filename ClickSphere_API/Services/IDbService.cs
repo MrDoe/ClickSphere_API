@@ -1,4 +1,4 @@
-namespace ClickViews_API.Services
+namespace ClickSphere_API.Services
 {
     public interface IDbService
     {

@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ClickViews_API.Services;
-using ClickViews_API.Models;
+using ClickSphere_API.Services;
+using ClickSphere_API.Models;
 
-namespace ClickViews_API.Controllers
+namespace ClickSphere_API.Controllers
 {
     /**
-     * The base class for ClickViews API controllers.
+     * The base class for ClickSphere API controllers.
      */
     [ApiController]
     public class ViewController(IDbService dbService) : ControllerBase
@@ -65,5 +65,19 @@ namespace ClickViews_API.Controllers
             else
                 return Results.BadRequest("Could not drop view");
         }
+
+        /**
+        * Get the views of a database which are registered in ClickSphere
+        * @param database The database to get the views from
+        * @return The views of the database
+        */
+        [Authorize]
+        [HttpGet]
+        [Route("/getViewConfig")]
+        public async Task<IEnumerable<Dictionary<string, object>>> GetViewConfig(string database)
+        {
+           return await _dbService.ExecuteQueryDictionary($"SELECT c.* FROM system.tables s join ClickSphere.Views c on c.ID = s.name where s.database = '{database}' and s.engine = 'View'");
+        }
+
     }
 }

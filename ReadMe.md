@@ -1,16 +1,16 @@
-# ClickViews API
+# ClickSphere API
 
 ## Description
 
-ClickViews API is a middleware application that acts as a bridge between the ClickViews database and other applications. It is developed using .NET 8 and provides a RESTful interface for querying the database. This API enables seamless integration and interaction with the ClickViews database, allowing authenticated users to retrieve data and perform various operations.
+ClickSphere API is a middleware application that acts as a bridge between the ClickSphere database and other applications. It is developed using .NET 8 and provides a RESTful interface for querying the database. This API enables seamless integration and interaction with the ClickSphere database, allowing authenticated users to retrieve data and perform various operations.
 Please note that this API is not feature complete and still in development.
 
 ## Installation
 
-To install and run the ClickViews_API application, follow these steps:
+To install and run the ClickSphere_API application, follow these steps:
 
-1. Clone the repository: `git clone https://github.com/MrDoe/ClickViews_API.git`
-2. Navigate to the project directory: `cd ClickViews_API`
+1. Clone the repository: `git clone https://github.com/MrDoe/ClickSphere_API.git`
+2. Navigate to the project directory: `cd ClickSphere_API`
 3. Install dependencies: `dotnet restore`
 4. Build the project: `dotnet build`
 5. Edit the configuration file `appsettings.json` to configure your ClickHouse server address, port, user and default database.
@@ -19,14 +19,14 @@ To install and run the ClickViews_API application, follow these steps:
 
 ## Usage
 
-To use the ClickViews_API application, follow these steps:
+To use the ClickSphere_API application, follow these steps:
 
 1. Make sure the application is running.
-2. Send HTTP requests to the appropriate endpoints to interact with ClickViews (see the Tests folder for examples).
+2. Send HTTP requests to the appropriate endpoints to interact with ClickSphere (see the Tests folder for examples).
 
 ## Contributing
 
-Contributions are welcome! If you would like to contribute to the ClickViews API project, please follow these guidelines:
+Contributions are welcome! If you would like to contribute to the ClickSphere API project, please follow these guidelines:
 
 1. Fork the repository.
 2. Create a new branch: `git checkout -b my-feature`
@@ -40,4 +40,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
 
-If you have any questions or suggestions regarding the ClickViews API application, please contact Christoph Döllinger at <a href="mailto:christoph.doellinger&#64;med.uni-heidelberg.de">christoph.doellinger&#64;med.uni-heidelberg.de</a>.
+If you have any questions or suggestions regarding the ClickSphere API application, please contact Christoph Döllinger at <a href="mailto:christoph.doellinger&#64;med.uni-heidelberg.de">christoph.doellinger&#64;med.uni-heidelberg.de</a>.

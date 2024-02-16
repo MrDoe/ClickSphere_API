@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ClickViews_API.Services;
+using ClickSphere_API.Services;
 
-namespace ClickViews_API.Controllers
+namespace ClickSphere_API.Controllers
 {
     /**
-     * The base class for ClickViews API controllers.
+     * The base class for ClickSphere API controllers.
      */
     [ApiController]
     public class DatabaseController(IDbService dbService) : ControllerBase
@@ -72,16 +72,16 @@ namespace ClickViews_API.Controllers
         }
 
         /**
-        * Get the views of a database which are registered in ClickViews
+        * Get the views of a database
         * @param database The database to get the views from
         * @return The views of the database
         */
         [Authorize]
         [HttpGet]
         [Route("/getViews")]
-        public async Task<IEnumerable<Dictionary<string, object>>> GetViews(string database)
+        public async Task<IEnumerable<string>> GetViews(string database)
         {
-           return await _dbService.ExecuteQueryDictionary($"SELECT c.* FROM system.tables s join CV_Views c on c.ID = s.name where s.database = '{database}' and s.engine = 'View'");
+           return await _dbService.ExecuteQuery($"SELECT name FROM system.tables where database = '{database}' and engine = 'View'");
         }
     }
 }

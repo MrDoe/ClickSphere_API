@@ -1,8 +1,8 @@
 using System.Security.Claims;
-using ClickViews_API.Models;
+using ClickSphere_API.Models;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 
-namespace ClickViews_API.Services
+namespace ClickSphere_API.Services
 {
     /**
      * This class is used to manage user accounts
@@ -55,15 +55,15 @@ namespace ClickViews_API.Services
         * This method retrieves all users from the Users table
         * @return A list of User objects representing the users in the table
         */
-        public async Task<List<User>> GetUsers()
+        public async Task<List<CreatUserRequest>> GetUsers()
         {
             string query = "SELECT id, name FROM system.users";
             var result = await _dbService.ExecuteQueryDictionary(query);
 
-            List<User> users = [];
+            List<CreatUserRequest> users = [];
             foreach (var row in result)
             {
-                User user = new()
+                CreatUserRequest user = new()
                 {
                     UserId = Guid.Parse(row["id"].ToString()!),
                     UserName = row["name"].ToString()!
@@ -160,6 +160,24 @@ namespace ClickViews_API.Services
             string query = $"ALTER USER {userName} IDENTIFIED BY '{newPassword}'";
             await _dbService.ExecuteNonQuery(query);
             return true;
+        }
+
+        /**
+        * This method gets the user configuration from ClickSphere.Users
+        * @param userName The user name of the user
+        * @return The user configuration
+        */
+        public async Task<UserConfig> GetUserConfig(string userName)
+        {
+            string query = $"SELECT * FROM ClickSphere.User WHERE name = '{userName}'";
+            var result = await _dbService.ExecuteQueryDictionary(query);
+            var userConfig = result.Select(row => new UserConfig
+            {
+                UserName = row["Name"].ToString()!,
+                LDAP_User = row["LDAP_User"].ToString()!
+            }).FirstOrDefault();
+
+            return userConfig;
         }
     }
 }
