@@ -12,7 +12,7 @@ namespace ClickSphere_API.Controllers
     public class ViewController(IDbService dbService) : ControllerBase
     {
         private readonly IDbService _dbService = dbService;
-       
+
         /**
         * Create a new view in the specified database
         * @param database The database where the view should be created
@@ -27,14 +27,14 @@ namespace ClickSphere_API.Controllers
         {
             string query = $"CREATE VIEW {view.Database}.{view.Id} AS {view.Query};";
             int result = await _dbService.ExecuteNonQuery(query);
-            
+
             // insert view into CV_Views table
             if (result == 0)
             {
-                string insertQuery = $"INSERT INTO CV_Views (ID, Name, Description) VALUES ('{view.Id}', '{view.Name}', '{view.Description}');";
+                string insertQuery = $"INSERT INTO ClickSphere.Views (Id, Name, Description) VALUES ('{view.Id}', '{view.Name}', '{view.Description}');";
                 int insertResult = await _dbService.ExecuteNonQuery(insertQuery);
                 if (insertResult < 0)
-                    return Results.BadRequest("Could not insert view into CV_Views table");
+                    return Results.BadRequest("Could not insert view into ClickSphere.Views table");
                 else
                     return Results.Ok();
             }
@@ -55,13 +55,13 @@ namespace ClickSphere_API.Controllers
         {
             int result = await _dbService.ExecuteNonQuery($"DROP VIEW {database}.{view}");
             if (result == 0)
-               {
-                    result = await _dbService.ExecuteNonQuery($"DELETE FROM CV_Views WHERE ID = '{view}'");
-                    if (result == 0)
-                        return Results.Ok();
-                    else
-                        return Results.BadRequest("Could not delete view from CV_Views table");
-               }
+            {
+                result = await _dbService.ExecuteNonQuery($"DELETE FROM ClickSphere.Views WHERE Id = '{view}'");
+                if (result == 0)
+                    return Results.Ok();
+                else
+                    return Results.BadRequest("Could not delete view from ClickSphere.Views table");
+            }
             else
                 return Results.BadRequest("Could not drop view");
         }
@@ -76,7 +76,7 @@ namespace ClickSphere_API.Controllers
         [Route("/getViewConfig")]
         public async Task<IEnumerable<Dictionary<string, object>>> GetViewConfig(string database)
         {
-           return await _dbService.ExecuteQueryDictionary($"SELECT c.* FROM system.tables s join ClickSphere.Views c on c.ID = s.name where s.database = '{database}' and s.engine = 'View'");
+            return await _dbService.ExecuteQueryDictionary($"SELECT c.* FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name WHERE s.database = '{database}' and s.engine = 'View'");
         }
 
     }

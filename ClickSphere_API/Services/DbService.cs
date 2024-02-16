@@ -162,11 +162,11 @@ namespace ClickSphere_API.Services
             await ExecuteNonQuery(query);
             
             // create the users table if it does not exist
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.User (Id String, LDAP_User String, FirstName String, LastName String, Phone String, Department String) ENGINE = TinyLog";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Phone String, Department String) ENGINE = MergeTree() ORDER BY Id";
             await ExecuteNonQuery(query);
 
             // create the views table if it does not exist
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.View (Id String, Name String, Description String) ENGINE = TinyLog";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String) ENGINE = MergeTree() ORDER BY Id";
             await ExecuteNonQuery(query);
         }
     }
