@@ -46,7 +46,7 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not create table");
         }
 
-                /**
+        /**
         * Delete a table from a database
         * @param database The database where the table is located
         * @param table The table to delete

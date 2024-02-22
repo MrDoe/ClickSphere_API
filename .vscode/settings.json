@@ -1,5 +1,9 @@
 {
     "github.copilot.chat.localeOverride": "en",
     "github.copilot.editor.enableCodeActions": true,
-    "github.copilot.chat.welcomeMessage": "never"
+    "github.copilot.chat.welcomeMessage": "never",
+    "STARLIMS.url": "http://bmbh02.ads.krz.uni-heidelberg.de/starlims/",
+    "STARLIMS.rootPath": "C:\\Daten\\",
+    "STARLIMS.user": "DC",
+    "STARLIMS.browser": "msedge"
 }
