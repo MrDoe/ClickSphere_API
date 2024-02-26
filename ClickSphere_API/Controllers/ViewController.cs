@@ -31,7 +31,7 @@ namespace ClickSphere_API.Controllers
             // insert view into CV_Views table
             if (result == 0)
             {
-                string insertQuery = $"INSERT INTO ClickSphere.Views (Id, Name, Description) VALUES ('{view.Id}', '{view.Name}', '{view.Description}');";
+                string insertQuery = $"INSERT INTO ClickSphere.Views (Id, Name, Description, Type) VALUES ('{view.Id}','{view.Name}','{view.Description}','V');";
                 int insertResult = await _dbService.ExecuteNonQuery(insertQuery);
                 if (insertResult < 0)
                     return Results.BadRequest("Could not insert view into ClickSphere.Views table");
@@ -40,6 +40,49 @@ namespace ClickSphere_API.Controllers
             }
             else
                 return Results.BadRequest("Could not create view");
+        }
+
+        /**
+        * Create materialized view in the specified database
+        * @param database The database where the materialized view should be created
+        * @param viewName The name of the materialized view to create
+        * @param query The query that defines the materialized view
+        * @return The result of the materialized view creation
+        */
+        [Authorize]
+        [HttpPost]
+        [Route("/createMaterializedView")]
+        public async Task<IResult> CreateMaterializedView(MaterializedView view)
+        {
+            // create materialized view
+            string query = $"CREATE MATERIALIZED VIEW {view.Database}.{view.Id} " + 
+                           $"ENGINE = {view.Engine} ";
+            
+            if(view.PartitionBy != null)
+                query += $"PARTITION BY {view.PartitionBy} ";
+            
+            if(view.OrderBy != null)
+                query += $"ORDER BY {view.OrderBy} ";
+
+            if(view.Populate == true)
+                query += "POPULATE ";
+            
+            query += $"AS {view.Query};";
+            
+            int result = await _dbService.ExecuteNonQuery(query);
+
+            // insert view into ClickSphere.Views metadata table
+            if (result == 0)
+            {
+                string insertQuery = $"INSERT INTO ClickSphere.Views (Id, Name, Description, Type) VALUES ('{view.Id}','{view.Name}','{view.Description}','M');";
+                int insertResult = await _dbService.ExecuteNonQuery(insertQuery);
+                if (insertResult < 0)
+                    return Results.BadRequest("Could not insert view into ClickSphere.Views table");
+                else
+                    return Results.Ok();
+            }
+            else
+                return Results.BadRequest("Could not create materialized view");
         }
 
         /**
@@ -123,6 +166,20 @@ namespace ClickSphere_API.Controllers
             }
             else
                 return Results.BadRequest("Could not update view");
+        }
+
+        /**
+        * Get view columns and type for QBE search
+        * @param database The database to get the view from
+        * @param viewId The viewId to get the columns from
+        * @return The columns of the view
+        */
+        [Authorize]
+        [HttpGet]
+        [Route("/getViewColumns")]
+        public async Task<IEnumerable<Dictionary<string, object>>> GetViewColumns(string database, string viewId)
+        {
+            return await _dbService.ExecuteQueryDictionary($"SELECT name, type FROM system.columns WHERE table = '{database}.{viewId}'");
         }
     }
 }

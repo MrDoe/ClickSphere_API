@@ -190,7 +190,7 @@ namespace ClickSphere_API.Services
             await ExecuteNonQuery(query);
 
             // create the views table if it does not exist
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String) ENGINE = MergeTree() ORDER BY Id";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = MergeTree() ORDER BY Id";
             await ExecuteNonQuery(query);
         }
     }
