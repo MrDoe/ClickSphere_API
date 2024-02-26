@@ -167,7 +167,7 @@ namespace ClickSphere_API.Services
         * @param userName The user name of the user
         * @return The user configuration
         */
-        public async Task<UserConfig> GetUserConfig(string userName)
+        public async Task<UserConfig?> GetUserConfig(string userName)
         {
             string query = $"SELECT * FROM ClickSphere.User WHERE name = '{userName}'";
             var result = await _dbService.ExecuteQueryDictionary(query);

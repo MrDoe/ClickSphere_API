@@ -63,6 +63,12 @@ builder.Services.AddAuthentication().AddBearerToken(config =>
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
+// enable compression for Kestrel
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -74,6 +80,25 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "ClickSphere API V1");
     });
 }
+
+// enable cache-control for static files
+app.UseStaticFiles(new StaticFileOptions()
+{
+  OnPrepareResponse =
+  r => {
+    if(r == null || r.File == null || r.File.PhysicalPath == null)
+        return;
+    
+    string path = r.File.PhysicalPath;
+    if (path.EndsWith(".css") || path.EndsWith(".js") || 
+    path.EndsWith(".gif") || path.EndsWith(".jpg") || 
+    path.EndsWith(".png") || path.EndsWith(".svg") || path.EndsWith(".webp"))
+    {
+      TimeSpan maxAge = new TimeSpan(370, 0, 0, 0);
+      r.Context.Response.Headers.Append("Cache-Control", "max-age=" + maxAge.TotalSeconds.ToString("0"));
+    }
+  },
+});
 
 //app.UseHttpsRedirection();
 

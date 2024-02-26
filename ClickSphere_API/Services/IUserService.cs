@@ -14,6 +14,6 @@ namespace ClickSphere_API.Services
         Task<bool> AssignRole(string userName, string roleName);
         Task<bool> RemoveRole(string userName, string roleName);
         Task<bool> UpdatePassword(string userName, string newPassword);
-        Task<UserConfig> GetUserConfig(string userName);
+        Task<UserConfig?> GetUserConfig(string userName);
     }
 }

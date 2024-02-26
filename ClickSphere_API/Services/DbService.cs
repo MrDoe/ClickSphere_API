@@ -1,3 +1,4 @@
+using System.Dynamic;
 using Octonica.ClickHouseClient;
 
 namespace ClickSphere_API.Services
@@ -122,6 +123,29 @@ namespace ClickSphere_API.Services
                     row.Add(reader.GetName(i), reader.GetValue(i));
                 }
                 result.Add(row);
+            }
+            return result;
+        }
+
+        /**
+         * This method is used to execute a query on the ClickHouse database which returns an object
+         * @param query The query to be executed
+         * @return T The result of the query
+        */
+        public async Task<T> ExecuteQueryObject<T>(string query) where T : class, new()
+        {
+            using var connection = CreateConnection();
+            await connection.OpenAsync();
+            var command = connection.CreateCommand(query);
+            var reader = await command.ExecuteReaderAsync();
+            var result = new T();
+            if (await reader.ReadAsync())
+            {
+                for (int i = 0; i < reader.FieldCount; ++i)
+                {
+                    var property = typeof(T).GetProperty(reader.GetName(i));
+                    property?.SetValue(result, reader.GetValue(i));
+                }
             }
             return result;
         }

@@ -7,5 +7,6 @@ namespace ClickSphere_API.Services
         Task<int> ExecuteNonQuery(string query);
         Task<object?> ExecuteScalar(string query);
         Task<bool> CheckLogin(string user, string password);
+        Task<T> ExecuteQueryObject<T>(string query) where T : class, new();
     }
 }

@@ -150,7 +150,7 @@ namespace ClickSphere_API.Controllers
         [Authorize]
         [HttpGet]
         [Route("/getUserConfig")]
-        public async Task<UserConfig> GetUserConfig(string userName)
+        public async Task<UserConfig?> GetUserConfig(string userName)
         {
             return await _userService.GetUserConfig(userName);
         }

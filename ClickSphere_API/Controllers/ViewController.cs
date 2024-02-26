@@ -23,7 +23,7 @@ namespace ClickSphere_API.Controllers
         [Authorize]
         [HttpPost]
         [Route("/createView")]
-        public async Task<IResult> CreateView(CreateViewRequest view)
+        public async Task<IResult> CreateView(View view)
         {
             string query = $"CREATE VIEW {view.Database}.{view.Id} AS {view.Query};";
             int result = await _dbService.ExecuteNonQuery(query);
@@ -73,11 +73,56 @@ namespace ClickSphere_API.Controllers
         */
         [Authorize]
         [HttpGet]
-        [Route("/getViewConfig")]
-        public async Task<IEnumerable<Dictionary<string, object>>> GetViewConfig(string database)
+        [Route("/getAllViews")]
+        public async Task<IEnumerable<Dictionary<string, object>>> GetAllViews(string database)
         {
-            return await _dbService.ExecuteQueryDictionary($"SELECT c.* FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name WHERE s.database = '{database}' and s.engine = 'View'");
+            return await _dbService.ExecuteQueryDictionary("SELECT c.*, s.database as Database, s.as_select as Query " +
+                                                           "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " + 
+                                                          $"WHERE s.database = '{database}' and s.engine = 'View'");
         }
 
+        /**
+        * Get configuration of specific view from database
+        * @param database The database to get the view from
+        * @param viewId The viewId to get the configuration from
+        * @return The configuration of the view
+        */
+        [Authorize]
+        [HttpGet]
+        [Route("/getViewConfig")]
+        public async Task<View> GetViewConfig(string database, string viewId)
+        {
+            return await _dbService.ExecuteQueryObject<View>("SELECT c.Id, c.Name, c.Description, s.database as Database, s.as_select as Query " + 
+                                                             "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " + 
+                                                             $"WHERE s.database = '{database}' and s.engine = 'View' and c.Id = '{viewId}'");
+        }
+
+        /**
+        * Update a view in the specified database
+        * @param database The database where the view should be updated
+        * @param view The view to update
+        * @return The result of the view update
+        */
+        [Authorize]
+        [HttpPost]
+        [Route("/updateView")]
+        public async Task<IResult> UpdateView(View view)
+        {          
+            string query = $"CREATE OR REPLACE VIEW {view.Database}.{view.Id} AS {view.Query};";
+            int result = await _dbService.ExecuteNonQuery(query);
+
+            // update view in CV_Views table
+            if (result == 0)
+            {
+                string updateQuery = $"UPDATE ClickSphere.Views SET Name = '{view.Name}', Description = '{view.Description}' WHERE Id = '{view.Id}';";
+                int updateResult = await _dbService.ExecuteNonQuery(updateQuery);
+                if (updateResult < 0)
+                    return Results.BadRequest("Could not update view in ClickSphere.Views table");
+                else
+                    return Results.Ok();
+            }
+            else
+                return Results.BadRequest("Could not update view");
+        }
     }
 }
