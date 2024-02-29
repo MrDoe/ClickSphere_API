@@ -179,7 +179,7 @@ namespace ClickSphere_API.Controllers
         [Route("/getViewColumns")]
         public async Task<IEnumerable<Dictionary<string, object>>> GetViewColumns(string database, string viewId)
         {
-            return await _dbService.ExecuteQueryDictionary($"SELECT name, type FROM system.columns WHERE table = '{viewId}' and database = '{database}'");
+            return await _dbService.ExecuteQueryDictionary($"SELECT name as `Column Name`, type as `Data Type` FROM system.columns WHERE table = '{viewId}' and database = '{database}'");
         }
     }
 }
