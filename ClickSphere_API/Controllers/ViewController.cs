@@ -116,14 +116,28 @@ namespace ClickSphere_API.Controllers
         */
         [Authorize]
         [HttpGet]
-        [Route("/getAllViews")]
-        public async Task<IEnumerable<Dictionary<string, object>>> GetAllViews(string database)
+        [Route("/getAllViewsForTable")]
+        public async Task<IEnumerable<Dictionary<string, object>>> GetAllViewsForTable(string database)
         {
             return await _dbService.ExecuteQueryDictionary("SELECT c.*, s.database as Database, s.as_select as Query " +
                                                            "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " + 
                                                           $"WHERE s.database = '{database}' and s.engine = 'View'");
         }
 
+        /**
+        * Get the views of a database which are registered in ClickSphere
+        * @param database The database to get the views from
+        * @return The views of the database
+        */
+        [Authorize]
+        [HttpGet]
+        [Route("/getAllViews")]
+        public async Task<List<View>> GetAllViews(string database)
+        {
+            return await _dbService.ExecuteQueryList<View>("SELECT c.*, s.database as Database, s.as_select as Query " +
+                                                           "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " + 
+                                                          $"WHERE s.database = '{database}' and s.engine = 'View'");
+        }
         /**
         * Get configuration of specific view from database
         * @param database The database to get the view from

@@ -6,7 +6,7 @@ namespace ClickSphere_API.Services;
 */
 public class SqlParser : ISqlParser
 {
-    private static readonly char[] separator = [' ', '\t', '\n', '\r', ',', '(', ')', ';', '=', '<', '>', '+', '-', '*', '/'];
+    private static readonly char[] separator = [' '];
 
     public ParsedQuery Parse(string query)
     {
@@ -74,7 +74,7 @@ public class SqlParser : ISqlParser
     private static bool IsValidName(string name)
     {
         // Only allow alphanumeric characters, underscores and spaces in table and column names
-        return Regex.IsMatch(name, @"^[*a-zA-Z0-9_\s`']+$");
+        return Regex.IsMatch(name, @"^[*a-zA-Z0-9_\s`'!=<>()]+$%");
     }
 }
 

@@ -151,6 +151,31 @@ namespace ClickSphere_API.Services
         }
 
         /**
+        * This method is used to execute a query on the ClickHouse database
+        * @param query The query to be executed
+        * @return A List of T that represents the result of the query
+        */
+        public async Task<List<T>> ExecuteQueryList<T>(string query) where T : class, new()
+        {
+            using var connection = CreateConnection();
+            await connection.OpenAsync();
+            var command = connection.CreateCommand(query);
+            var reader = await command.ExecuteReaderAsync();
+            var result = new List<T>();
+            while (await reader.ReadAsync())
+            {
+                var row = new T();
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    var property = typeof(T).GetProperty(reader.GetName(i));
+                    property?.SetValue(row, reader.GetValue(i));
+                }
+                result.Add(row);
+            }
+            return result;
+        }
+
+        /**
          * This method is used to execute a non-query on the ClickHouse database
          * @param query The query to be executed
          */

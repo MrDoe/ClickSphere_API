@@ -70,18 +70,5 @@ namespace ClickSphere_API.Controllers
         {
             return await _dbService.ExecuteQuery($"SHOW TABLES FROM {database}");
         }
-
-        /**
-        * Get the views of a database
-        * @param database The database to get the views from
-        * @return The views of the database
-        */
-        [Authorize]
-        [HttpGet]
-        [Route("/getViews")]
-        public async Task<IEnumerable<string>> GetViews(string database)
-        {
-           return await _dbService.ExecuteQuery($"SELECT name FROM system.tables where database = '{database}' and engine = 'View'");
-        }
     }
 }
