@@ -9,10 +9,10 @@ namespace ClickSphere_API.Controllers
      * The base class for ClickSphere API controllers.
      */
     [ApiController]
-    public class DataController(IDbService dbService) : ControllerBase
+    public class DataController(IDbService dbService, ISqlParser sqlParser) : ControllerBase
     {
         private readonly IDbService _dbService = dbService;
-       
+
         /**
         * Execute custom query with SQL string in base64 format
         * @param query The query to be executed
@@ -26,15 +26,15 @@ namespace ClickSphere_API.Controllers
             // decode base64 string
             query = Encoding.UTF8.GetString(Convert.FromBase64String(query));
 
-            // abort if query contains data modifying statements
-            if (query.Contains("INSERT INTO") || query.Contains("UPDATE") || query.Contains("DELETE") || query.Contains("DROP") ||
-                query.Contains("GRANT") || query.Contains("REVOKE") || query.Contains("CREATE") || query.Contains("ALTER") ||
-                query.Contains("TRUNCATE") || query.Contains("RENAME"))
+            // validate and sanitize the input
+            var parsedQuery = sqlParser.Parse(query);
+            if (!parsedQuery.IsValid || parsedQuery.SanitizedQuery == null)
             {
-                return [new Dictionary<string, object> { { "error", "Data modifying statements are not allowed" } }];
+                return [new Dictionary<string, object> { { "error", "Invalid SQL query" } }];
             }
 
-            return await _dbService.ExecuteQueryDictionary(query);
+            // execute the sanitized query
+            return await _dbService.ExecuteQueryDictionary(parsedQuery.SanitizedQuery);
         }
-   }
+    }
 }
