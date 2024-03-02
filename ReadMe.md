@@ -2,8 +2,9 @@
 
 ## Description
 
-ClickSphere API is a middleware application that acts as a bridge between the ClickHouse database and other applications. It is developed using .NET 8 and provides a RESTful interface for querying the database. This API enables seamless integration and interaction with the ClickSphere database, allowing authenticated users to retrieve data and perform various operations.
-Please note that this API is not feature complete and still in development.
+ClickSphere API is a middleware application that acts as a bridge between the ClickHouse database and other applications. It is developed using .NET 8 and provides a RESTful interface for querying the database. Compared to the standard HTTP interface, it offers higher level procedures for querying ClickHouse. This API enables seamless integration and interaction with the ClickSphere database in other applications, allowing authenticated users to retrieve data and perform various operations.
+
+Please note that this API is not feature complete and still in development and therefore should not be used in productive environments.
 
 ## Installation
 
@@ -21,7 +22,7 @@ To install and run the ClickSphere_API application, follow these steps:
 
 To use the ClickSphere_API application, follow these steps:
 
-1. Make sure the application is running.
+1. Make sure the ClickHouse server and ClickSphere_API is running.
 2. Send HTTP requests to the appropriate endpoints to interact with ClickSphere (see the Tests folder for examples).
 
 ## Contributing
