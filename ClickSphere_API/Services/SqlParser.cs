@@ -17,7 +17,7 @@ public class SqlParser : ISqlParser
         bool insideStringLiteral = false;
         foreach (char c in query)
         {
-            if (c == '\'')
+            if (c == '\'' || c == '"')
             {
                 insideStringLiteral = !insideStringLiteral;
             }
@@ -67,14 +67,14 @@ public class SqlParser : ISqlParser
 
     private static bool IsSqlKeyword(string word)
     {
-        var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "AS", "JOIN", "ON", "INNER", "OUTER", "LEFT", "RIGHT", "FULL", "CROSS", "UNION", "ALL", "EXCEPT", "INTERSECT", "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET" };
+        var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "AS", "JOIN", "ON", "INNER", "OUTER", "LEFT", "RIGHT", "FULL", "CROSS", "UNION", "ALL", "EXCEPT", "INTERSECT", "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET", "INTO", "OUTFILE", "DUMPFILE" };
         return keywords.Contains(word.ToUpperInvariant());
     }
 
     private static bool IsValidName(string name)
     {
-        // Only allow alphanumeric characters, underscores and spaces in table and column names
-        return Regex.IsMatch(name, @"^[*a-zA-Z0-9_\s`'!=<>()]+$%");
+        // Only allow alphanumeric characters, underscores, spaces, backticks, quotes, and @ signs in table and column names
+        return Regex.IsMatch(name, @"^[*a-zA-Z0-9_\s`'""@!=<>()]+$%");
     }
 }
 
