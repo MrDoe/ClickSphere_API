@@ -138,6 +138,7 @@ namespace ClickSphere_API.Controllers
                                                            "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " + 
                                                           $"WHERE s.database = '{database}' and s.engine = 'View'");
         }
+        
         /**
         * Get configuration of specific view from database
         * @param database The database to get the view from

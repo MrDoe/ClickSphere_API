@@ -34,7 +34,14 @@ namespace ClickSphere_API.Controllers
             }
 
             // execute the sanitized query
-            return await _dbService.ExecuteQueryDictionary(parsedQuery.SanitizedQuery);
+            try 
+            {
+                return await _dbService.ExecuteQueryDictionary(parsedQuery.SanitizedQuery);
+            }
+            catch (Exception e)
+            {
+                return [new Dictionary<string, object> { { "Error", e.Message } }];
+            }
         }
     }
 }

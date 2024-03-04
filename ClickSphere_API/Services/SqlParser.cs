@@ -4,7 +4,7 @@ namespace ClickSphere_API.Services;
 /*
 * A service class for parsing and validating SQL queries to prevent SQL injection attacks.
 */
-public class SqlParser : ISqlParser
+public partial class SqlParser : ISqlParser
 {
     private static readonly char[] separator = [' '];
 
@@ -67,15 +67,21 @@ public class SqlParser : ISqlParser
 
     private static bool IsSqlKeyword(string word)
     {
-        var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "AS", "JOIN", "ON", "INNER", "OUTER", "LEFT", "RIGHT", "FULL", "CROSS", "UNION", "ALL", "EXCEPT", "INTERSECT", "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET", "INTO", "OUTFILE", "DUMPFILE" };
+        // filter only the keywords that are used in the application
+        var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET"};
+
+        //var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "AS", "JOIN", "ON", "INNER", "OUTER", "LEFT", "RIGHT", "FULL", "CROSS", "UNION", "ALL", "EXCEPT", "INTERSECT", "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET", "INTO", "OUTFILE", "DUMPFILE" };
         return keywords.Contains(word.ToUpperInvariant());
     }
 
     private static bool IsValidName(string name)
     {
-        // Only allow alphanumeric characters, underscores, spaces, backticks, quotes, and @ signs in table and column names
-        return Regex.IsMatch(name, @"^[*a-zA-Z0-9_\s`'""@!=<>()]+$%");
+        // Only allow alphanumeric characters and some special chars used in SQL
+        return MyRegex().IsMatch(name);
     }
+
+    [GeneratedRegex(@"^[\*a-zA-Z0-9_\s`'""@!=<>()%]+$")]
+    private static partial Regex MyRegex();
 }
 
 public class ParsedQuery
