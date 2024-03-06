@@ -1,0 +1,3 @@
+[submodule "ClickHouseClient"]
+	path = ClickHouseClient
+	url = https://github.com/MrDoe/ClickHouseClient
