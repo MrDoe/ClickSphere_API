@@ -40,7 +40,7 @@ namespace ClickSphere_API.Services
                 Port = Port,
                 User = configuration["ClickHouse:User"]!,
                 Password = configuration["ClickHouse:Password"],
-                Database = configuration["ClickHouse:Database"]
+                Database = configuration["ClickHouse:Database"],
             } ?? throw new Exception("ClickHouse connection string is not valid");
 
             InitializeDatabase().Wait();

@@ -17,10 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\ClickHouseClient\src\Octonica.ClickHouseClient\Octonica.ClickHouseClient.csproj" />
+    <ProjectReference Include="..\ClickHouseClient\src\Octonica.ClickHouseClient\Octonica.ClickHouseClient.csproj" />
   </ItemGroup>
-
-  <!--<Target Name="PostBuild" AfterTargets="Build">
-    <Exec Command="xcopy $(MSBuildProjectDirectory)\LocalPackages\*.* $(OutDir) /s /y" />
-  </Target>-->
 </Project>
