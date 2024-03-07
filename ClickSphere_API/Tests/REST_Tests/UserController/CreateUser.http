@@ -1,8 +1,8 @@
 POST http://localhost:5007/createUser HTTP/1.1
 Content-Type: application/json
-Authorization: Bearer CfDJ8KkI2x9pSWNDpSOUrcmK-fZGsZaRzA0Yr10ifkk-DrQdlFWor5libYiU34mMm3hywhWVI8asn36qQVVr8lDU9krppUQWxIT5w4AVxlJ_J_HWWZvgGMAi5QkRyM3L-Y2O3rWQXhrYB6MbwH4TsFZT6fTlzs0yhJ-spkbTkADugvatOXRNzri2QTF_Txy-cn1AY1BPy8Z0ZD_u5hvJRldV2JwOqaWH3tcShJGI3cD2gplApS_Icyg4FCEtW-t7xGxoZAyskt3QUSLnThwlFQw-Jcw
+Authorization: Bearer CfDJ8KkI2x9pSWNDpSOUrcmK-fZrdxyKWTd4S3lnERxHsxXTmlqb77JAElxX01vQSEXJEcU1AfMZd0Hhdk0exYTbk-msjvmNYyYDdo7HAisqjWjayUC40nsu7FLr7vbWkA2P0nwRb-4gPrQYwXe3D1g4Zb4t-l4CPzwQfPRTHm0i7YY3I6a9QHFiUJaczLWgZ2AjrPg6d7lfA-6sDfUH4Ruf-YHqIg7y-GGuGwTceNoRPC4YJiPQL6xIBap3PSmAKnVCQcVYE4cf_fPYMwJg5_L0WuQ
 
 {
-    "UserName": "christoph",
+    "UserName": "christoph1234",
     "Password": "123456"
 }

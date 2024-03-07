@@ -1,9 +1,8 @@
 namespace ClickSphere_API.Models
 {
-    public class CreatUserRequest
+    public class CreateUserRequest
     {
-        public required Guid UserId { get; set; }
         public required string UserName { get; set; }
-        public string? Password { get; set; }
+        public required string Password { get; set; }
     }
 }

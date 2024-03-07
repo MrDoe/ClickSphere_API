@@ -7,7 +7,7 @@ namespace ClickSphere_API.Services
     {
         Task<bool> CreateUser(string username, string password);
         Task<ClaimsPrincipal?> CheckLogin(string username, string password);
-        Task<List<CreatUserRequest>> GetUsers();
+        Task<List<UserConfig>> GetUsers();
         Task<List<Role>> GetRoles();
         Task<Role?> GetUserRole(string userName);
         Task<bool> DeleteUser(string userName);

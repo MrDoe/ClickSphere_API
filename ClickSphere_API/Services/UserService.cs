@@ -22,9 +22,9 @@ namespace ClickSphere_API.Services
             // check if user exists
             string query = $"SELECT name FROM system.users WHERE name = '{username}'";
             var result = await _dbService.ExecuteScalar(query);
-            if (result != null)
+            if (result is not DBNull)
                 return false;
-            
+
             // create the user
             query = $"CREATE USER {username} IDENTIFIED BY '{password}'";
             await _dbService.ExecuteNonQuery(query);
@@ -55,15 +55,15 @@ namespace ClickSphere_API.Services
         * This method retrieves all users from the Users table
         * @return A list of User objects representing the users in the table
         */
-        public async Task<List<CreatUserRequest>> GetUsers()
+        public async Task<List<UserConfig>> GetUsers()
         {
             string query = "SELECT id, name FROM system.users";
             var result = await _dbService.ExecuteQueryDictionary(query);
 
-            List<CreatUserRequest> users = [];
+            List<UserConfig> users = [];
             foreach (var row in result)
             {
-                CreatUserRequest user = new()
+                UserConfig user = new()
                 {
                     UserId = Guid.Parse(row["id"].ToString()!),
                     UserName = row["name"].ToString()!
@@ -83,7 +83,7 @@ namespace ClickSphere_API.Services
         {
             string query = $"SELECT id, name FROM system.roles";
             var result = await _dbService.ExecuteQueryDictionary(query);
-            
+
             List<Role> roles = result.Select(row => new Role
             {
                 RoleId = Guid.Parse(row["id"].ToString()!),
@@ -173,6 +173,7 @@ namespace ClickSphere_API.Services
             var result = await _dbService.ExecuteQueryDictionary(query);
             var userConfig = result.Select(row => new UserConfig
             {
+                UserId = Guid.Parse(row["Id"].ToString()!),
                 UserName = row["Name"].ToString()!,
                 LDAP_User = row["LDAP_User"].ToString()!
             }).FirstOrDefault();

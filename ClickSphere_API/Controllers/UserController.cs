@@ -25,10 +25,10 @@ namespace ClickSphere_API.Controllers
         {
             if (user == null)
                 return Results.BadRequest("User is required");
-            if (user.UserName == null || user.Password == null)
+            if (user.Username == null || user.Password == null)
                 return Results.BadRequest("Username and password are required");
 
-            var claimsPrincipal = await _userService.CheckLogin(user.UserName, user.Password);
+            var claimsPrincipal = await _userService.CheckLogin(user.Username, user.Password);
 
             if (claimsPrincipal != null)
                 return Results.SignIn(claimsPrincipal);
@@ -44,7 +44,7 @@ namespace ClickSphere_API.Controllers
         [Authorize]
         [HttpPost]
         [Route("/createUser")]
-        public async Task<IResult> CreateUser([FromBody] LoginRequest user)
+        public async Task<IResult> CreateUser([FromBody] CreateUserRequest user)
         {
             if (user == null)
                 return Results.BadRequest("User is required");
@@ -72,10 +72,10 @@ namespace ClickSphere_API.Controllers
             if (user == null)
                 return Results.BadRequest("User is required");
 
-            if (string.IsNullOrEmpty(user.UserName))
+            if (string.IsNullOrEmpty(user.Username))
                 return Results.BadRequest("Username is required");
 
-            bool result = await _userService.DeleteUser(user.UserName);
+            bool result = await _userService.DeleteUser(user.Username);
             if (result)
                 return Results.Ok();
             else
@@ -89,7 +89,7 @@ namespace ClickSphere_API.Controllers
         [Authorize]
         [HttpGet]
         [Route("/getUsers")]
-        public async Task<IEnumerable<CreatUserRequest>> GetUsers()
+        public async Task<IEnumerable<UserConfig>> GetUsers()
         {
             return await _userService.GetUsers();
         }
