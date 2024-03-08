@@ -42,7 +42,7 @@ builder.Services.AddSwaggerGen(c =>
 // custom services
 builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 builder.Services.AddScoped<IDbService, DbService>();
-builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IApiUserService, ApiUserService>();
 builder.Services.AddScoped<ISqlParser, SqlParser>();
 
 // read token expiration from configuration

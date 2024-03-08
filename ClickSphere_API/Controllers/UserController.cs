@@ -9,9 +9,9 @@ namespace ClickSphere_API.Controllers
      * The base class for ClickSphere API controllers.
      */
     [ApiController]
-    public class UserController(IUserService userService) : ControllerBase
+    public class UserController(IApiUserService userService) : ControllerBase
     {
-        private IUserService _userService = userService;
+        private IApiUserService _userService = userService;
 
         /**
           * This method is used to log in a user

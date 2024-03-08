@@ -7,7 +7,7 @@ namespace ClickSphere_API.Services
     /**
      * This class is used to manage user accounts
      */
-    public class UserService(IDbService dbService) : IUserService
+    public class ApiUserService(IDbService dbService) : IApiUserService
     {
         private readonly IDbService _dbService = dbService;
 
@@ -28,6 +28,29 @@ namespace ClickSphere_API.Services
             // create the user
             query = $"CREATE USER {username} IDENTIFIED BY '{password}'";
             await _dbService.ExecuteNonQuery(query);
+
+            // get the new user's id
+            query = $"SELECT id FROM system.users WHERE name = '{username}'";
+            result = await _dbService.ExecuteScalar(query);
+            if (result is DBNull)
+                return false;
+            
+            var userId = result!.ToString();
+
+            // create the user's configuration
+            query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department) VALUES ('{userId}', '{username}', '', '', '', '', '', '')";
+            await _dbService.ExecuteNonQuery(query);
+
+            // check if insert was successful
+            query = $"SELECT Id FROM ClickSphere.Users WHERE UserName = '{username}'";
+            result = await _dbService.ExecuteScalar(query);
+            if (result is DBNull)
+                return false;
+
+            // assign the default role to the user
+            query = $"GRANT ROLE default TO USER {username}";
+            await _dbService.ExecuteNonQuery(query);
+
             return true;
         }
 
@@ -57,7 +80,7 @@ namespace ClickSphere_API.Services
         */
         public async Task<List<UserConfig>> GetUsers()
         {
-            string query = "SELECT id, name FROM system.users";
+            string query = "SELECT toString(Id) as Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department from ClickSphere.Users";
             var result = await _dbService.ExecuteQueryDictionary(query);
 
             List<UserConfig> users = [];
@@ -65,13 +88,18 @@ namespace ClickSphere_API.Services
             {
                 UserConfig user = new()
                 {
-                    UserId = Guid.Parse(row["id"].ToString()!),
-                    UserName = row["name"].ToString()!
+                    Id = Guid.Parse(row["Id"].ToString()!),
+                    UserName = row["UserName"].ToString()!,
+                    LDAP_User = row["LDAP_User"].ToString()!,
+                    Email = row["Email"].ToString()!,
+                    FirstName = row["FirstName"].ToString()!,
+                    LastName = row["LastName"].ToString()!,
+                    Phone = row["Phone"].ToString()!,
+                    Department = row["Department"].ToString()!
                 };
 
                 users.Add(user);
             }
-
             return users;
         }
 
@@ -169,13 +197,18 @@ namespace ClickSphere_API.Services
         */
         public async Task<UserConfig?> GetUserConfig(string userName)
         {
-            string query = $"SELECT * FROM ClickSphere.User WHERE name = '{userName}'";
+            string query = $"SELECT * FROM ClickSphere.Users WHERE name = '{userName}'";
             var result = await _dbService.ExecuteQueryDictionary(query);
             var userConfig = result.Select(row => new UserConfig
             {
-                UserId = Guid.Parse(row["Id"].ToString()!),
+                Id = Guid.Parse(row["Id"].ToString()!),
                 UserName = row["Name"].ToString()!,
-                LDAP_User = row["LDAP_User"].ToString()!
+                LDAP_User = row["LDAP_User"].ToString()!,
+                Email = row["Email"].ToString()!,
+                FirstName = row["FirstName"].ToString()!,
+                LastName = row["LastName"].ToString()!,
+                Phone = row["Phone"].ToString()!,
+                Department = row["Department"].ToString()!
             }).FirstOrDefault();
 
             return userConfig;
