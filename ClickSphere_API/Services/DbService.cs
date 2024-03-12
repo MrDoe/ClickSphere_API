@@ -1,4 +1,3 @@
-using System.Dynamic;
 using Octonica.ClickHouseClient;
 
 namespace ClickSphere_API.Services
@@ -14,7 +13,7 @@ namespace ClickSphere_API.Services
         private ushort Port { get; set; }
 
         /**
-         * This is the constructor for the DbService class
+         * Constructor for the DbService class
          */
         public DbService(IConfiguration configuration)
         {
@@ -47,7 +46,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-         * This method is used to create a connection to the ClickHouse database
+         * Create a connection to the ClickHouse database
          * @return A ClickHouseConnection object that represents the connection to the database
          */
         private ClickHouseConnection CreateConnection()
@@ -59,7 +58,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-        * This method is used to check if the login credentials are valid
+        * Check if the login credentials are valid
         * @param user The username of the user
         * @param password The password of the user
         */
@@ -73,7 +72,7 @@ namespace ClickSphere_API.Services
                 await connection.OpenAsync();  // Try to open a connection
                 
                 using var command = connection.CreateCommand();
-                command.CommandText = "SELECT 1";  // Try to execute a simple query
+                command.CommandText = "SELECT 1";  // Try to Execute a simple query
                 await command.ExecuteScalarAsync();
                 
                 return true;
@@ -85,7 +84,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-         * This method is used to execute a query on the ClickHouse database
+         * Execute a query on the ClickHouse database
          * @param query The query to be executed
          * @return A list of strings that represent the result of the query
          */
@@ -96,6 +95,7 @@ namespace ClickSphere_API.Services
             var command = connection.CreateCommand(query);
             var reader = await command.ExecuteReaderAsync();
             var result = new List<string>();
+
             while (await reader.ReadAsync())
             {
                 result.Add(reader.GetString(0));
@@ -104,7 +104,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-         * This method is used to execute a query on the ClickHouse database
+         * Execute a query on the ClickHouse database
          * @param query The query to be executed
          * @return A List of dictionary of <string, object> that represents the result of the query
          */
@@ -115,6 +115,7 @@ namespace ClickSphere_API.Services
             var command = connection.CreateCommand(query);
             var reader = await command.ExecuteReaderAsync();
             var result = new List<Dictionary<string, object>>();
+
             while (await reader.ReadAsync())
             {
                 var row = new Dictionary<string, object>();
@@ -128,7 +129,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-         * This method is used to execute a query on the ClickHouse database which returns an object
+         * Execute a query on the ClickHouse database which returns an object
          * @param query The query to be executed
          * @return T The result of the query
         */
@@ -139,6 +140,7 @@ namespace ClickSphere_API.Services
             var command = connection.CreateCommand(query);
             var reader = await command.ExecuteReaderAsync();
             var result = new T();
+
             if (await reader.ReadAsync())
             {
                 for (int i = 0; i < reader.FieldCount; ++i)
@@ -151,7 +153,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-        * This method is used to execute a query on the ClickHouse database
+        * Execute a query on the ClickHouse database
         * @param query The query to be executed
         * @return A List of T that represents the result of the query
         */
@@ -162,6 +164,7 @@ namespace ClickSphere_API.Services
             var command = connection.CreateCommand(query);
             var reader = await command.ExecuteReaderAsync();
             var result = new List<T>();
+
             while (await reader.ReadAsync())
             {
                 var row = new T();
@@ -176,7 +179,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-         * This method is used to execute a non-query on the ClickHouse database
+         * Execute a non-query on the ClickHouse database
          * @param query The query to be executed
          */
         public async Task<int> ExecuteNonQuery(string query)
@@ -188,7 +191,7 @@ namespace ClickSphere_API.Services
         }
 
         /**
-         * This method is used to execute a scalar query on the ClickHouse database
+         * Execute a scalar query on the ClickHouse database
          * @param query The query to be executed
          * @return The result of the query
          */
@@ -202,20 +205,26 @@ namespace ClickSphere_API.Services
         }
 
         /**
-        * This method is used to initialize the database
+        * Initialize the ClickSphere database and create the required tables
         */
         public async Task InitializeDatabase()
         {
-            // create the database if it does not exist
             string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
             await ExecuteNonQuery(query);
             
-            // create the users table if it does not exist
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String) ENGINE = MergeTree() ORDER BY Id";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String) ENGINE = TinyLog()";
             await ExecuteNonQuery(query);
 
-            // create the views table if it does not exist
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = MergeTree() ORDER BY Id";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = TinyLog()";
+            await ExecuteNonQuery(query);
+        }
+
+        /**
+        * Delete the ClickSphere database
+        */
+        public async Task DeleteDatabase()
+        {
+            string query = "DROP DATABASE IF EXISTS ClickSphere";
             await ExecuteNonQuery(query);
         }
     }
