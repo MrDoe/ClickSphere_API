@@ -42,15 +42,20 @@ namespace ClickSphere_API.Services
             await _dbService.ExecuteNonQuery(query);
 
             // check if insert was successful
-            query = $"SELECT Id FROM ClickSphere.Users WHERE UserName = '{username}'";
+            query = $"SELECT UserName FROM ClickSphere.Users WHERE UserName = '{username}'";
             result = await _dbService.ExecuteScalar(query);
             if (result is DBNull)
                 return false;
 
             // assign the default role to the user
             query = $"GRANT ROLE default TO USER {username}";
-            await _dbService.ExecuteNonQuery(query);
-
+            try
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+            }
             return true;
         }
 
@@ -90,12 +95,12 @@ namespace ClickSphere_API.Services
                 {
                     Id = Guid.Parse(row["Id"].ToString()!),
                     UserName = row["UserName"].ToString()!,
-                    LDAP_User = row["LDAP_User"].ToString()!,
-                    Email = row["Email"].ToString()!,
-                    FirstName = row["FirstName"].ToString()!,
-                    LastName = row["LastName"].ToString()!,
-                    Phone = row["Phone"].ToString()!,
-                    Department = row["Department"].ToString()!
+                    LDAP_User = row["LDAP_User"]?.ToString()!,
+                    Email = row["Email"]?.ToString()!,
+                    FirstName = row["FirstName"]?.ToString()!,
+                    LastName = row["LastName"]?.ToString()!,
+                    Phone = row["Phone"]?.ToString()!,
+                    Department = row["Department"]?.ToString()!
                 };
 
                 users.Add(user);
@@ -173,8 +178,31 @@ namespace ClickSphere_API.Services
         public async Task<bool> DeleteUser(string userName)
         {
             string query = $"DROP USER {userName}";
-            await _dbService.ExecuteNonQuery(query);
-            return true;
+            try 
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+            }
+
+            query = $"DELETE FROM ClickSphere.Users WHERE UserName = '{userName}'";
+
+            try 
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+            }
+
+            // check if user was deleted
+            query = $"SELECT name FROM system.users WHERE name = '{userName}'";
+            var result = await _dbService.ExecuteScalar(query);
+            if (result is not DBNull)
+                return false;
+            else
+                return true;
         }
 
         /**

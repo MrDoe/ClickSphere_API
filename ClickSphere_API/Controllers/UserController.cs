@@ -67,15 +67,12 @@ namespace ClickSphere_API.Controllers
         [Authorize]
         [HttpDelete]
         [Route("/deleteUser")]
-        public async Task<IResult> DeleteUser([FromBody] LoginRequest user)
+        public async Task<IResult> DeleteUser(string username)
         {
-            if (user == null)
-                return Results.BadRequest("User is required");
-
-            if (string.IsNullOrEmpty(user.Username))
+            if (string.IsNullOrEmpty(username))
                 return Results.BadRequest("Username is required");
 
-            bool result = await _userService.DeleteUser(user.Username);
+            bool result = await _userService.DeleteUser(username);
             if (result)
                 return Results.Ok();
             else
@@ -89,7 +86,7 @@ namespace ClickSphere_API.Controllers
         [Authorize]
         [HttpGet]
         [Route("/getUsers")]
-        public async Task<IEnumerable<UserConfig>> GetUsers()
+        public async Task<List<UserConfig>> GetUsers()
         {
             return await _userService.GetUsers();
         }

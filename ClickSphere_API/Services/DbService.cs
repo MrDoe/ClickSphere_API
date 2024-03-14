@@ -209,13 +209,15 @@ namespace ClickSphere_API.Services
         */
         public async Task InitializeDatabase()
         {
+            //DeleteDatabase().Wait();
+
             string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
             await ExecuteNonQuery(query);
             
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String) ENGINE = TinyLog()";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String) ENGINE = MergeTree() ORDER BY Id";
             await ExecuteNonQuery(query);
 
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = TinyLog()";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = MergeTree() ORDER BY Id";
             await ExecuteNonQuery(query);
         }
 
