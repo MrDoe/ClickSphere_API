@@ -26,7 +26,15 @@ namespace ClickSphere_API.Controllers
         public async Task<IResult> CreateView(View view)
         {
             string query = $"CREATE VIEW {view.Database}.{view.Id} AS {view.Query};";
-            int result = await _dbService.ExecuteNonQuery(query);
+            int result;
+            try 
+            {
+                result = await _dbService.ExecuteNonQuery(query);
+            }
+            catch (Exception e)
+            {
+                return Results.BadRequest(e.Message);
+            }
 
             // insert view into CV_Views table
             if (result == 0)

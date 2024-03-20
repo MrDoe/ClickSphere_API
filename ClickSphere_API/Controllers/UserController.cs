@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ClickSphere_API.Models;
 using ClickSphere_API.Services;
+using ClickSphere_API.Tools;
+using Microsoft.AspNetCore.Authentication;
 
 namespace ClickSphere_API.Controllers
 {
@@ -11,7 +13,7 @@ namespace ClickSphere_API.Controllers
     [ApiController]
     public class UserController(IApiUserService userService) : ControllerBase
     {
-        private IApiUserService _userService = userService;
+        private readonly IApiUserService _userService = userService;
 
         /**
           * This method is used to log in a user
@@ -31,9 +33,28 @@ namespace ClickSphere_API.Controllers
             var claimsPrincipal = await _userService.CheckLogin(user.Username, user.Password);
 
             if (claimsPrincipal != null)
-                return Results.SignIn(claimsPrincipal);
+            {
+                var authProperties = new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+                };
+                return Results.SignIn(claimsPrincipal, authProperties);
+            }
             else
                 return Results.BadRequest("Could not verify username and password");
+        }
+
+        /**
+        * This method is used to log out a user
+        * @return The result of the logout
+        */
+        [Authorize]
+        [HttpPost]
+        [Route("/logout")]
+        public async Task<IResult> Logout()
+        {
+            return Results.SignOut();
         }
 
         /**
@@ -49,14 +70,14 @@ namespace ClickSphere_API.Controllers
             if (user == null)
                 return Results.BadRequest("User is required");
 
-            if (string.IsNullOrEmpty(user.UserName) || string.IsNullOrEmpty(user.Password))
+            if (string.IsNullOrEmpty(user.Username) || string.IsNullOrEmpty(user.Password))
                 return Results.BadRequest("Username and password are required");
 
-            bool result = await _userService.CreateUser(user.UserName, user.Password);
-            if (result)
+            Result result = await _userService.CreateUser(user.Username, user.Password);
+            if (result.IsSuccessful)
                 return Results.Ok();
             else
-                return Results.BadRequest("Could not create user: User already exists.");
+                return Results.BadRequest(result.Output);
         }
 
         /**
@@ -72,11 +93,11 @@ namespace ClickSphere_API.Controllers
             if (string.IsNullOrEmpty(username))
                 return Results.BadRequest("Username is required");
 
-            bool result = await _userService.DeleteUser(username);
-            if (result)
+            Result result = await _userService.DeleteUser(username);
+            if (result.IsSuccessful)
                 return Results.Ok();
             else
-                return Results.BadRequest("Could not delete user: User does not exist.");
+                return Results.BadRequest(result.Output);
         }
 
         /**
@@ -129,28 +150,58 @@ namespace ClickSphere_API.Controllers
             if (model == null)
                 return Results.BadRequest("User and role are required");
 
-            if (string.IsNullOrEmpty(model.UserName) || string.IsNullOrEmpty(model.RoleName))
+            if (string.IsNullOrEmpty(model.Username) || string.IsNullOrEmpty(model.RoleName))
                 return Results.BadRequest("User and role are required");
 
-            bool result = await _userService.AssignRole(model.UserName, model.RoleName);
-            if (result)
+            Result result = await _userService.AssignRole(model.Username, model.RoleName);
+            if (result.IsSuccessful)
                 return Results.Ok();
             else
-                return Results.BadRequest("Could not assign role: User or role does not exist.");
+                return Results.BadRequest(result.Output);
         }
 
         /**
         * Get user configuration from ClickSphere.users
-        * @param userName The user name of the user
+        * @param userId The user id of the user
         * @return The user configuration
         */
         [Authorize]
         [HttpGet]
         [Route("/getUserConfig")]
-        public async Task<UserConfig?> GetUserConfig(string userName)
+        public async Task<IResult?> GetUserConfig(string userId)
         {
-            return await _userService.GetUserConfig(userName);
+            if(Guid.TryParse(userId, out Guid uid))
+            {
+                var result = await _userService.GetUserConfig(uid);
+                if (result != null)
+                    return Results.Ok(result);
+                else
+                    return Results.BadRequest("User does not exist");
+            }
+            else
+            {
+                return Results.BadRequest("User ID has to be a valid GUID");
+            }
         }
 
+        /**
+        * Update user configuration
+        * @param model The user configuration to update
+        * @return The result of the update
+        */
+        [Authorize]
+        [HttpPost]
+        [Route("/updateUser")]
+        public async Task<IResult> UpdateUser([FromBody] UserConfig user)
+        {
+            if (user == null)
+                return Results.BadRequest("User is required");
+
+            Result result = await _userService.UpdateUser(user);
+            if (result.IsSuccessful)
+                return Results.Ok();
+            else
+                return Results.BadRequest(result.Output);
+        }
     }
 }

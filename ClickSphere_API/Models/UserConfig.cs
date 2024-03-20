@@ -8,7 +8,7 @@ namespace ClickSphere_API.Models
         public required Guid Id { get; set; }
 
         [JsonPropertyName("userName")]
-        public required string UserName { get; set; }
+        public required string Username { get; set; }
 
         [JsonPropertyName("ldapUser")]
         public string? LDAP_User { get; set; }

@@ -7,6 +7,7 @@
     <UserSecretsId>dc50391f-282f-4a88-9d6c-7793a8426914</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Ardalis.GuardClauses" Version="4.5.0" />
     <ProjectReference Include="..\ClickHouseClient\src\Octonica.ClickHouseClient\Octonica.ClickHouseClient.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />

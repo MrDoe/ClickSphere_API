@@ -214,7 +214,7 @@ namespace ClickSphere_API.Services
             string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
             await ExecuteNonQuery(query);
             
-            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String) ENGINE = MergeTree() ORDER BY Id";
+            query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, Username String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String) ENGINE = MergeTree() ORDER BY Id";
             await ExecuteNonQuery(query);
 
             query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = MergeTree() ORDER BY Id";

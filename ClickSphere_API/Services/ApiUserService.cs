@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using ClickSphere_API.Models;
 using Microsoft.AspNetCore.Authentication.BearerToken;
+using Microsoft.AspNetCore.Authorization;
+using ClickSphere_API.Tools;
 
 namespace ClickSphere_API.Services
 {
@@ -17,13 +19,13 @@ namespace ClickSphere_API.Services
         * @param password The password of the user
         * @return True if the user was created, otherwise false
         */
-        public async Task<bool> CreateUser(string username, string password)
+        public async Task<Result> CreateUser(string username, string password)
         {
             // check if user exists
             string query = $"SELECT name FROM system.users WHERE name = '{username}'";
             var result = await _dbService.ExecuteScalar(query);
             if (result is not DBNull)
-                return false;
+                return Result.BadRequest("User already exists");
 
             // create the user
             query = $"CREATE USER {username} IDENTIFIED BY '{password}'";
@@ -33,7 +35,7 @@ namespace ClickSphere_API.Services
             query = $"SELECT id FROM system.users WHERE name = '{username}'";
             result = await _dbService.ExecuteScalar(query);
             if (result is DBNull)
-                return false;
+                return Result.BadRequest("Could not create user");
             
             var userId = result!.ToString();
 
@@ -45,7 +47,7 @@ namespace ClickSphere_API.Services
             query = $"SELECT UserName FROM ClickSphere.Users WHERE UserName = '{username}'";
             result = await _dbService.ExecuteScalar(query);
             if (result is DBNull)
-                return false;
+                return Result.BadRequest("Could not create user");
 
             // assign the default role to the user
             query = $"GRANT ROLE default TO USER {username}";
@@ -55,8 +57,9 @@ namespace ClickSphere_API.Services
             }
             catch(Exception)
             {
+                return Result.BadRequest("Could not assign default role");
             }
-            return true;
+            return Result.Ok();
         }
 
         /**
@@ -94,7 +97,7 @@ namespace ClickSphere_API.Services
                 UserConfig user = new()
                 {
                     Id = Guid.Parse(row["Id"].ToString()!),
-                    UserName = row["UserName"].ToString()!,
+                    Username = row["UserName"].ToString()!,
                     LDAP_User = row["LDAP_User"]?.ToString()!,
                     Email = row["Email"]?.ToString()!,
                     FirstName = row["FirstName"]?.ToString()!,
@@ -150,11 +153,18 @@ namespace ClickSphere_API.Services
         * @param roleName The name of the role to assign
         * @return True if the role was assigned, otherwise false
         */
-        public async Task<bool> AssignRole(string userName, string roleName)
+        public async Task<Result> AssignRole(string userName, string roleName)
         {
             string query = $"GRANT ROLE {roleName} TO USER {userName}";
-            await _dbService.ExecuteNonQuery(query);
-            return true;
+            try 
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+                return Result.BadRequest("Could not assign role");
+            }
+            return Result.Ok();
         }
 
         /**
@@ -163,11 +173,18 @@ namespace ClickSphere_API.Services
         * @param roleName The name of the role to remove
         * @return True if the role was removed, otherwise false
         */
-        public async Task<bool> RemoveRole(string userName, string roleName)
+        public async Task<Result> RemoveRole(string userName, string roleName)
         {
             string query = $"REVOKE ROLE {roleName} FROM USER {userName}";
-            await _dbService.ExecuteNonQuery(query);
-            return true;
+            try 
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+                return Result.BadRequest("Could not remove role");
+            }
+            return Result.Ok();
         }
 
         /**
@@ -175,9 +192,9 @@ namespace ClickSphere_API.Services
         * @param userName The user name of the user
         * @return True if the user was deleted, otherwise false
         */
-        public async Task<bool> DeleteUser(string userName)
+        public async Task<Result> DeleteUser(string username)
         {
-            string query = $"DROP USER {userName}";
+            string query = $"DROP USER {username}";
             try 
             {
                 await _dbService.ExecuteNonQuery(query);
@@ -186,7 +203,7 @@ namespace ClickSphere_API.Services
             {
             }
 
-            query = $"DELETE FROM ClickSphere.Users WHERE UserName = '{userName}'";
+            query = $"DELETE FROM ClickSphere.Users WHERE UserName = '{username}'";
 
             try 
             {
@@ -197,12 +214,12 @@ namespace ClickSphere_API.Services
             }
 
             // check if user was deleted
-            query = $"SELECT name FROM system.users WHERE name = '{userName}'";
+            query = $"SELECT name FROM system.users WHERE name = '{username}'";
             var result = await _dbService.ExecuteScalar(query);
             if (result is not DBNull)
-                return false;
+                return Result.BadRequest("Could not delete user");
             else
-                return true;
+                return Result.Ok();
         }
 
         /**
@@ -211,11 +228,11 @@ namespace ClickSphere_API.Services
         * @param newPassword The new password of the user
         * @return True if the password was updated, otherwise false
         */
-        public async Task<bool> UpdatePassword(string userName, string newPassword)
+        public async Task<Result> UpdatePassword(string userName, string newPassword)
         {
             string query = $"ALTER USER {userName} IDENTIFIED BY '{newPassword}'";
-            await _dbService.ExecuteNonQuery(query);
-            return true;
+            var result = await _dbService.ExecuteNonQuery(query);
+            return result > 0 ? Result.Ok() : Result.BadRequest("Could not update password");
         }
 
         /**
@@ -223,23 +240,43 @@ namespace ClickSphere_API.Services
         * @param userName The user name of the user
         * @return The user configuration
         */
-        public async Task<UserConfig?> GetUserConfig(string userName)
+        public async Task<UserConfig?> GetUserConfig(Guid userId)
         {
-            string query = $"SELECT * FROM ClickSphere.Users WHERE name = '{userName}'";
+            string query = $"SELECT * FROM ClickSphere.Users WHERE Id = '{userId}'";
             var result = await _dbService.ExecuteQueryDictionary(query);
             var userConfig = result.Select(row => new UserConfig
             {
                 Id = Guid.Parse(row["Id"].ToString()!),
-                UserName = row["Name"].ToString()!,
+                Username = row["UserName"].ToString()!,
                 LDAP_User = row["LDAP_User"].ToString()!,
-                Email = row["Email"].ToString()!,
                 FirstName = row["FirstName"].ToString()!,
                 LastName = row["LastName"].ToString()!,
+                Email = row["Email"].ToString()!,
                 Phone = row["Phone"].ToString()!,
                 Department = row["Department"].ToString()!
             }).FirstOrDefault();
 
             return userConfig;
+        }
+
+        /**
+        * This method updates the user configuration in ClickSphere.Users
+        * @param user The user configuration to update
+        * @return True if the user configuration was updated, otherwise false
+        */
+        public async Task<Result> UpdateUser(UserConfig user)
+        {
+            string query = $"ALTER TABLE ClickSphere.Users UPDATE " +
+                           $"UserName = '{user.Username}'," +
+                           $"LDAP_User = '{user.LDAP_User}'," +
+                           $"FirstName = '{user.FirstName}'," + 
+                           $"LastName = '{user.LastName}'," +
+                           $"Email = '{user.Email}'," +
+                           $"Phone = '{user.Phone}'," +
+                           $"Department = '{user.Department}' " +
+                           $"WHERE Id = '{user.Id}'";
+            var nReturn = await _dbService.ExecuteNonQuery(query);
+            return nReturn == 0 ? Result.Ok() : Result.BadRequest("Could not update user");
         }
     }
 }

@@ -5,7 +5,7 @@ Content-Type: application/json
 {
     "Database": "default",
     "Table": "Users",
-    "Columns": "UserId UUID, UserName String",
+    "Columns": "UserId UUID, Username String",
     "Limit": "10",
-    "OrderBy": "UserName DESC"
+    "OrderBy": "Username DESC"
 }

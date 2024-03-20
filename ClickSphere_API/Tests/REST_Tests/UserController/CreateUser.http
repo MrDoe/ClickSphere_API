@@ -3,6 +3,6 @@ Content-Type: application/json
 Authorization: Bearer CfDJ8KkI2x9pSWNDpSOUrcmK-fZrdxyKWTd4S3lnERxHsxXTmlqb77JAElxX01vQSEXJEcU1AfMZd0Hhdk0exYTbk-msjvmNYyYDdo7HAisqjWjayUC40nsu7FLr7vbWkA2P0nwRb-4gPrQYwXe3D1g4Zb4t-l4CPzwQfPRTHm0i7YY3I6a9QHFiUJaczLWgZ2AjrPg6d7lfA-6sDfUH4Ruf-YHqIg7y-GGuGwTceNoRPC4YJiPQL6xIBap3PSmAKnVCQcVYE4cf_fPYMwJg5_L0WuQ
 
 {
-    "UserName": "christoph1234",
+    "Username": "christoph1234",
     "Password": "123456"
 }

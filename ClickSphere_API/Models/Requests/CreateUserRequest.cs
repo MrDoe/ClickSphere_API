@@ -2,7 +2,7 @@ namespace ClickSphere_API.Models
 {
     public class CreateUserRequest
     {
-        public required string UserName { get; set; }
+        public required string Username { get; set; }
         public required string Password { get; set; }
         public string LDAP_User { get; set; }
         public string Email { get; set; }
