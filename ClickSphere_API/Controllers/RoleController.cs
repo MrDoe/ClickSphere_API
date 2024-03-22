@@ -10,11 +10,11 @@ namespace ClickSphere_API.Controllers;
 [ApiController]
 public class RoleController(IApiRoleService RoleService) : ControllerBase
 {
-    /**
-    * Create a new role in ClickHouse database system
-    * @param role The role to create
-    * @return The created role
-    */
+    /// <summary>
+    /// Create a new role in ClickHouse database system
+    /// </summary>
+    /// <param name="roleName">The role to create</param>
+    /// <returns>The created role</returns>
     [Authorize]
     [HttpPost]
     [Route("/createRole")]
@@ -50,10 +50,10 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
             return Results.BadRequest(result.Output);
     }
 
-    /**
-    * Retrieve all roles from the database system
-    * @return A list of strings representing all roles
-    */
+    /// <summary>
+    /// Retrieve all roles from the database system
+    /// </summary>
+    /// <returns>A list of strings representing all roles</returns>
     [Authorize]
     [HttpGet]
     [Route("/getRoles")]
@@ -63,12 +63,11 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
         return Results.Ok(roles);
     }
     
-    /**
-    * Assign a role to a user
-    * @param userName The user name of the user
-    * @param roleName The name of the role to assign
-    * @return True if the role was assigned, otherwise false
-    */
+    /// <summary>
+    /// Assign a role to a user
+    /// </summary>
+    /// <param name="request">The assignment request containing the user name and role name</param>
+    /// <returns>True if the role was assigned, otherwise false</returns>
     [Authorize]
     [HttpPost]
     [Route("/assignRoleToUser")]
@@ -84,12 +83,11 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
             return Results.BadRequest(result.Output);
     }
 
-    /**
-    * Remove a role from a user
-    * @param userName The user name of the user
-    * @param roleName The name of the role to remove
-    * @return True if the role was removed, otherwise false
-    */
+    /// <summary>
+    /// Remove a role from a user
+    /// </summary>
+    /// <param name="request">The assignment request containing the user name and role name</param>
+    /// <returns>True if the role was removed, otherwise false</returns>
     [Authorize]
     [HttpPost]
     [Route("/removeRoleFromUser")]
@@ -105,11 +103,11 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
             return Results.BadRequest(result.Output);
     }
 
-    /**
-    * Retrieve the roles associated with a user
-    * @param userName The user name of the user
-    * @return A list of strings representing the roles associated with the user
-    */
+    /// <summary>
+    /// Retrieve the roles associated with a user
+    /// </summary>
+    /// <param name="userName">The user name of the user</param>
+    /// <returns>A list of strings representing the roles associated with the user</returns>
     [Authorize]
     [HttpGet]
     [Route("/getUserRole")]
