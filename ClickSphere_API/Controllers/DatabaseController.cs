@@ -4,18 +4,18 @@ using ClickSphere_API.Services;
 
 namespace ClickSphere_API.Controllers
 {
-    /**
-     * The base class for ClickSphere API controllers.
-     */
+    /// <summary>
+    /// The base class for ClickSphere API controllers. 
+    /// </summary>
     [ApiController]
     public class DatabaseController(IDbService dbService) : ControllerBase
     {
         private readonly IDbService _dbService = dbService;
 
-        /**
-        * Get the databases of the ClickHouse server
-        * @return The databases of the server
-        */
+        /// <summary>
+        /// Get the databases of the ClickHouse server.
+        /// </summary>
+        /// <returns>The databases of the server.</returns>
         [Authorize]
         [HttpGet]
         [Route("/getDatabases")]
@@ -24,11 +24,11 @@ namespace ClickSphere_API.Controllers
             return await _dbService.ExecuteQuery("SHOW DATABASES");
         }
 
-        /**
-        * Create a new database
-        * @param database The name of the database to create
-        * @return The result of the database creation
-        */
+        /// <summary>
+        /// Create a new database.
+        /// </summary>
+        /// <param name="database">The name of the database to create.</param>
+        /// <returns>The result of the database creation.</returns>
         [Authorize]
         [HttpPost]
         [Route("/createDatabase")]
@@ -41,11 +41,11 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not create database");
         }
 
-        /**
-        * Drop a database
-        * @param database The name of the database to drop
-        * @return The result of the database drop
-        */
+        /// <summary>
+        /// Drop a database.
+        /// </summary>
+        /// <param name="database">The name of the database to drop.</param>
+        /// <returns>The result of the database drop.</returns>
         [Authorize]
         [HttpDelete]
         [Route("/deleteDatabase")]
@@ -58,11 +58,11 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not drop database");
         }
 
-        /**
-        * Get the tables of a database
-        * @param database The database to get the tables from
-        * @return The tables of the database
-        */
+        /// <summary>
+        /// Get the tables of a database.
+        /// </summary>
+        /// <param name="database">The database to get the tables from.</param>
+        /// <returns>The tables of the database.</returns>
         [Authorize]
         [HttpGet]
         [Route("/getTables")]

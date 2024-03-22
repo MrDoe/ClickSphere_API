@@ -5,21 +5,18 @@ using ClickSphere_API.Models;
 
 namespace ClickSphere_API.Controllers
 {
-    /**
-     * The base class for ClickSphere API controllers.
-     */
     [ApiController]
     public class ViewController(IDbService dbService) : ControllerBase
     {
         private readonly IDbService _dbService = dbService;
 
-        /**
-        * Create a new view in the specified database
-        * @param database The database where the view should be created
-        * @param viewName The name of the view to create
-        * @param query The query that defines the view
-        * @return The result of the view creation
-        */
+        /// <summary>
+        /// Create a new view in the specified database
+        /// </summary>
+        /// <param name="database">The database where the view should be created</param>
+        /// <param name="viewName">The name of the view to create</param>
+        /// <param name="query">The query that defines the view</param>
+        /// <returns>The result of the view creation</returns>
         [Authorize]
         [HttpPost]
         [Route("/createView")]
@@ -50,13 +47,13 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not create view");
         }
 
-        /**
-        * Create materialized view in the specified database
-        * @param database The database where the materialized view should be created
-        * @param viewName The name of the materialized view to create
-        * @param query The query that defines the materialized view
-        * @return The result of the materialized view creation
-        */
+        /// <summary>
+        /// Create materialized view in the specified database
+        /// </summary>
+        /// <param name="database">The database where the materialized view should be created</param>
+        /// <param name="viewName">The name of the materialized view to create</param>
+        /// <param name="query">The query that defines the materialized view</param>
+        /// <returns>The result of the materialized view creation</returns>
         [Authorize]
         [HttpPost]
         [Route("/createMaterializedView")]
@@ -93,12 +90,12 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not create materialized view");
         }
 
-        /**
-        * Delete a view from a database
-        * @param database The database where the view is located
-        * @param view The view to delete
-        * @return The result of the view deletion
-        */
+        /// <summary>
+        /// Delete a view from a database
+        /// </summary>
+        /// <param name="database">The database where the view is located</param>
+        /// <param name="view">The view to delete</param>
+        /// <returns>The result of the view deletion</returns>
         [Authorize]
         [HttpDelete]
         [Route("/deleteView")]
@@ -117,11 +114,11 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not drop view");
         }
 
-        /**
-        * Get the views of a database which are registered in ClickSphere
-        * @param database The database to get the views from
-        * @return The views of the database
-        */
+        /// <summary>
+        /// Get the views of a database which are registered in ClickSphere
+        /// </summary>
+        /// <param name="database">The database to get the views from</param>
+        /// <returns>The views of the database</returns>
         [Authorize]
         [HttpGet]
         [Route("/getAllViewsForTable")]
@@ -132,11 +129,11 @@ namespace ClickSphere_API.Controllers
                                                           $"WHERE s.database = '{database}' and s.engine = 'View'");
         }
 
-        /**
-        * Get the views of a database which are registered in ClickSphere
-        * @param database The database to get the views from
-        * @return The views of the database
-        */
+        /// <summary>
+        /// Get the views of a database which are registered in ClickSphere
+        /// </summary>
+        /// <param name="database">The database to get the views from</param>
+        /// <returns>The views of the database</returns>
         [Authorize]
         [HttpGet]
         [Route("/getAllViews")]
@@ -147,28 +144,28 @@ namespace ClickSphere_API.Controllers
                                                           $"WHERE s.database = '{database}' and s.engine = 'View'");
         }
         
-        /**
-        * Get configuration of specific view from database
-        * @param database The database to get the view from
-        * @param viewId The viewId to get the configuration from
-        * @return The configuration of the view
-        */
+        /// <summary>
+        /// Get configuration of specific view from database
+        /// </summary>
+        /// <param name="database">The database to get the view from</param>
+        /// <param name="viewId">The viewId to get the configuration from</param>
+        /// <returns>The configuration of the view</returns>
         [Authorize]
         [HttpGet]
         [Route("/getViewConfig")]
         public async Task<View> GetViewConfig(string database, string viewId)
         {
-            return await _dbService.ExecuteQueryObject<View>("SELECT c.Id, c.Name, c.Description, s.database as Database, s.as_select as Query " + 
-                                                             "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " + 
+            return await _dbService.ExecuteQueryObject<View>("SELECT c.Id, c.Name, c.Description, s.database as Database, s.as_select as Query " +
+                                                             "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " +
                                                              $"WHERE s.database = '{database}' and s.engine = 'View' and c.Id = '{viewId}'");
         }
 
-        /**
-        * Update a view in the specified database
-        * @param database The database where the view should be updated
-        * @param view The view to update
-        * @return The result of the view update
-        */
+        /// <summary>
+        /// Update a view in the specified database
+        /// </summary>
+        /// <param name="database">The database where the view should be updated</param>
+        /// <param name="view">The view to update</param>
+        /// <returns>The result of the view update</returns>
         [Authorize]
         [HttpPost]
         [Route("/updateView")]
@@ -191,12 +188,12 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not update view");
         }
 
-        /**
-        * Get view columns and type for QBE search
-        * @param database The database to get the view from
-        * @param viewId The viewId to get the columns from
-        * @return The columns of the view
-        */
+        /// <summary>
+        /// Get view columns and type for QBE search
+        /// </summary>
+        /// <param name="database">The database to get the view from</param>
+        /// <param name="viewId">The viewId to get the columns from</param>
+        /// <returns>The columns of the view</returns>
         [Authorize]
         [HttpGet]
         [Route("/getViewColumns")]

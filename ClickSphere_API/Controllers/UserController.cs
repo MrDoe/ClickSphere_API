@@ -7,19 +7,19 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace ClickSphere_API.Controllers
 {
-    /**
-     * The base class for ClickSphere API controllers.
-     */
+    /// <summary>
+    /// The base class for ClickSphere API controllers.
+    /// </summary>
     [ApiController]
     public class UserController(IApiUserService userService) : ControllerBase
     {
         private readonly IApiUserService _userService = userService;
 
-        /**
-          * This method is used to log in a user
-          * @param model The user to log in
-          * @return The result of the login
-          */
+        /// <summary>
+        /// This method is used to log in a user.
+        /// </summary>
+        /// <param name="model">The user to log in.</param>
+        /// <returns>The result of the login.</returns>
         [AllowAnonymous]
         [HttpPost]
         [Route("/login")]
@@ -45,23 +45,23 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not verify username and password");
         }
 
-        /**
-        * This method is used to log out a user
-        * @return The result of the logout
-        */
+        /// <summary>
+        /// This method is used to log out a user.
+        /// </summary>
+        /// <returns>The result of the logout.</returns>
         [Authorize]
         [HttpPost]
         [Route("/logout")]
-        public async Task<IResult> Logout()
+        public IResult Logout()
         {
             return Results.SignOut();
         }
 
-        /**
-        * Create new user
-        * @param model The user to create
-        * @return The result of the creation
-        */
+        /// <summary>
+        /// Create new user in the ClickSphere users table
+        /// </summary>
+        /// <param name="model">The user to create</param>
+        /// <returns>The result of the creation</returns>
         [Authorize]
         [HttpPost]
         [Route("/createUser")]
@@ -80,11 +80,11 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest(result.Output);
         }
 
-        /**
-        * Delete user
-        * @param model The user to delete^
-        * @return The result of the deletion
-        */
+        /// <summary>
+        /// Delete a user from the ClickSphere users table
+        /// </summary>
+        /// <param name="username"></param>
+        /// <returns></returns>
         [Authorize]
         [HttpDelete]
         [Route("/deleteUser")]
@@ -100,10 +100,10 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest(result.Output);
         }
 
-        /**
-        * Get all users from the Users table
-        * @return The list of users
-        */
+        /// <summary>
+        /// Get all users from the Users table
+        /// </summary>
+        /// <returns>The list of users</returns>
         [Authorize]
         [HttpGet]
         [Route("/getUsers")]
@@ -112,59 +112,11 @@ namespace ClickSphere_API.Controllers
             return await _userService.GetUsers();
         }
 
-        /**
-        * Get all roles from the Roles table
-        * @return The list of roles
-        */
-        [Authorize]
-        [HttpGet]
-        [Route("/getRoles")]
-        public async Task<List<Role>> GetRoles()
-        {
-            return await _userService.GetRoles();
-        }
-
-        /**
-        * Get role from a specific user
-        * @param userName The user name of the user
-        * @return The role of the user
-        */
-        [Authorize]
-        [HttpGet]
-        [Route("/getUserRole")]
-        public async Task<Role?> GetUserRole(string userName)
-        {
-            return await _userService.GetUserRole(userName);
-        }
-
-        /**
-        * Assign role to a user
-        * @param model The user and role to assign
-        * @return The result of the assignment
-        */
-        [Authorize]
-        [HttpPost]
-        [Route("/assignRole")]
-        public async Task<IResult> AssignRole([FromBody] AssignRoleRequest model)
-        {
-            if (model == null)
-                return Results.BadRequest("User and role are required");
-
-            if (string.IsNullOrEmpty(model.Username) || string.IsNullOrEmpty(model.RoleName))
-                return Results.BadRequest("User and role are required");
-
-            Result result = await _userService.AssignRole(model.Username, model.RoleName);
-            if (result.IsSuccessful)
-                return Results.Ok();
-            else
-                return Results.BadRequest(result.Output);
-        }
-
-        /**
-        * Get user configuration from ClickSphere.users
-        * @param userId The user id of the user
-        * @return The user configuration
-        */
+        /// <summary>
+        /// Get user configuration from ClickSphere.users
+        /// </summary>
+        /// <param name="userId">The user id of the user</param>
+        /// <returns>The user configuration</returns>
         [Authorize]
         [HttpGet]
         [Route("/getUserConfig")]
@@ -184,11 +136,11 @@ namespace ClickSphere_API.Controllers
             }
         }
 
-        /**
-        * Update user configuration
-        * @param model The user configuration to update
-        * @return The result of the update
-        */
+        /// <summary>
+        /// Update user configuration.
+        /// </summary>
+        /// <param name="user">The user configuration to update.</param>
+        /// <returns>The result of the update.</returns>
         [Authorize]
         [HttpPost]
         [Route("/updateUser")]

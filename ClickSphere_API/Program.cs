@@ -43,6 +43,7 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 builder.Services.AddScoped<IDbService, DbService>();
 builder.Services.AddScoped<IApiUserService, ApiUserService>();
+builder.Services.AddScoped<IApiRoleService, ApiRoleService>();
 builder.Services.AddScoped<ISqlParser, SqlParser>();
 
 // read token expiration from configuration

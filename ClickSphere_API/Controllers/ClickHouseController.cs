@@ -4,18 +4,18 @@ using ClickSphere_API.Services;
 
 namespace ClickSphere_API.Controllers
 {
-    /**
-     * The base class for ClickSphere API controllers.
-     */
+    /// <summary>
+    /// The base class for ClickSphere API controllers.
+    /// </summary>
     [ApiController]
     public class ClickHouseController(IDbService dbService) : ControllerBase
     {
         private readonly IDbService _dbService = dbService;
 
-        /**
-        * Get the version of the ClickHouse server
-        * @return The version of the server
-        */
+        /// <summary>
+        /// Get the version of the ClickHouse server.
+        /// </summary>
+        /// <returns>The version of the server.</returns>
         [Authorize]
         [HttpGet]
         [Route("/version")]

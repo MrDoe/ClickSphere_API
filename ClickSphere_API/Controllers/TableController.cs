@@ -6,21 +6,21 @@ using ClickSphere_API.Models;
 
 namespace ClickSphere_API.Controllers
 {
-    /**
-     * The base class for ClickSphere API controllers.
-     */
+    /// <summary>
+    /// The base class for ClickSphere API controllers.
+    /// </summary>
     [ApiController]
     public class TableController(IDbService dbService) : ControllerBase
     {
         private readonly IDbService _dbService = dbService;
 
-                /**
-        * Create a new table in the specified database
-        * @param database The database where the table should be created
-        * @param tableName The name of the table to create
-        * @param columns The columns of the table in the format "column1 datatype, column2 datatype, ..."
-        * @return The result of the table creation
-        */
+        /// <summary>
+        /// Create a new table in the specified database
+        /// </summary>
+        /// <param name="database">The database where the table should be created</param>
+        /// <param name="tableName">The name of the table to create</param>
+        /// <param name="columns">The columns of the table in the format "column1 datatype, column2 datatype, ..."</param>
+        /// <returns>The result of the table creation</returns>
         [Authorize]
         [HttpPost]
         [Route("/createTable")]
@@ -46,12 +46,12 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not create table");
         }
 
-        /**
-        * Delete a table from a database
-        * @param database The database where the table is located
-        * @param table The table to delete
-        * @return The result of the table deletion
-        */
+        /// <summary>
+        /// Delete a table from a database.
+        /// </summary>
+        /// <param name="database">The database where the table is located.</param>
+        /// <param name="table">The table to delete.</param>
+        /// <returns>The result of the table deletion.</returns>
         [Authorize]
         [HttpDelete]
         [Route("/deleteTable")]
@@ -64,12 +64,12 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not drop table");
         }
 
-        /**
-        * Get the columns of a table
-        * @param database The database where the table is located
-        * @param table The table to get the columns from
-        * @return The columns of the table
-        */
+        /// <summary>
+        /// Get the columns of a table.
+        /// </summary>
+        /// <param name="database">The database where the table is located.</param>
+        /// <param name="table">The table to get the columns from.</param>
+        /// <returns>The columns of the table.</returns>
         [Authorize]
         [HttpGet]
         [Route("/getColumns")]
@@ -78,13 +78,13 @@ namespace ClickSphere_API.Controllers
             return await _dbService.ExecuteQuery($"DESCRIBE {database}.{table}");
         }
 
-        /**
-        * Get the first n rows from a table
-        * @param database The database where the table is located
-        * @param table The table to get the rows from
-        * @param limit The number of rows to get
-        * @return The first n rows from the table
-        */
+        /// <summary>
+        /// Get the first n rows from a table.
+        /// </summary>
+        /// <param name="database">The database where the table is located.</param>
+        /// <param name="table">The table to get the rows from.</param>
+        /// <param name="limit">The number of rows to get.</param>
+        /// <returns>The first n rows from the table.</returns>
         [Authorize]
         [HttpPost]
         [Route("/getRows")]
@@ -107,13 +107,13 @@ namespace ClickSphere_API.Controllers
             return await _dbService.ExecuteQueryDictionary(sql);
         }
 
-        /**
-        * Insert a row into a table
-        * @param database The database where the table is located
-        * @param table The table to insert the row into
-        * @param values The values of the row in the format "value1, value2, ..."
-        * @return The result of the insertion
-        */
+        /// <summary>
+        /// Insert a row into a table.
+        /// </summary>
+        /// <param name="database">The database where the table is located.</param>
+        /// <param name="table">The table to insert the row into.</param>
+        /// <param name="values">The values of the row in the format "value1, value2, ...".</param>
+        /// <returns>The result of the insertion.</returns>
         [Authorize]
         [HttpPost]
         [Route("/insertRow")]
@@ -130,14 +130,14 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not insert row");
         }
 
-        /**
-        * Update a row in a table
-        * @param database The database where the table is located
-        * @param table The table to update the row in
-        * @param values The new values of the row in the format "column1 = value1, column2 = value2, ..."
-        * @param condition The condition that the row must satisfy
-        * @return The result of the update
-        */
+        /// <summary>
+        /// Update a row in a table.
+        /// </summary>
+        /// <param name="database">The database where the table is located.</param>
+        /// <param name="table">The table to update the row in.</param>
+        /// <param name="values">The new values of the row in the format "column1 = value1, column2 = value2, ...".</param>
+        /// <param name="condition">The condition that the row must satisfy.</param>
+        /// <returns>The result of the update.</returns>
         [Authorize]
         [HttpPost]
         [Route("/updateRow")]
@@ -155,13 +155,13 @@ namespace ClickSphere_API.Controllers
                 return Results.BadRequest("Could not update row");
         }
 
-        /**
-        * Delete a row from a table
-        * @param database The database where the table is located
-        * @param table The table to delete the row from
-        * @param condition The condition that the row must satisfy
-        * @return The result of the deletion
-        */
+        /// <summary>
+        /// Delete a row from a table.
+        /// </summary>
+        /// <param name="database">The database where the table is located.</param>
+        /// <param name="table">The table to delete the row from.</param>
+        /// <param name="condition">The condition that the row must satisfy.</param>
+        /// <returns>The result of the deletion.</returns>
         [Authorize]
         [HttpDelete]
         [Route("/deleteRow")]

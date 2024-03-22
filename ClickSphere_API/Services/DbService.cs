@@ -2,19 +2,19 @@ using Octonica.ClickHouseClient;
 
 namespace ClickSphere_API.Services
 {
-    /**
-     * This class is used to create a connection to the ClickHouse database
-     * and to execute queries on the database
-     */
+    /// <summary>
+    /// This class is used to create a connection to the ClickHouse database
+    /// and to execute queries on the database
+    /// </summary>
     public class DbService : IDbService
     {
         private readonly ClickHouseConnectionStringBuilder? _connString;
         private string Host { get; set; }
         private ushort Port { get; set; }
 
-        /**
-         * Constructor for the DbService class
-         */
+        /// <summary>
+        /// Constructor for the DbService class
+        /// </summary>
         public DbService(IConfiguration configuration)
         {
             // check required config values
@@ -45,10 +45,10 @@ namespace ClickSphere_API.Services
             InitializeDatabase().Wait();
         }
 
-        /**
-         * Create a connection to the ClickHouse database
-         * @return A ClickHouseConnection object that represents the connection to the database
-         */
+        /// <summary>
+        /// Create a connection to the ClickHouse database
+        /// </summary>
+        /// <returns>A ClickHouseConnection object that represents the connection to the database</returns>
         private ClickHouseConnection CreateConnection()
         {
             if(_connString == null)
@@ -57,11 +57,12 @@ namespace ClickSphere_API.Services
             return new ClickHouseConnection(_connString.ConnectionString);
         }
 
-        /**
-        * Check if the login credentials are valid
-        * @param user The username of the user
-        * @param password The password of the user
-        */
+        /// <summary>
+        /// Check if the login credentials are valid
+        /// </summary>
+        /// <param name="user">The username of the user</param>
+        /// <param name="password">The password of the user</param>
+        /// <returns>True if the login credentials are valid, false otherwise</returns>
         public async Task<bool> CheckLogin(string user, string password)
         {
             try
@@ -83,11 +84,11 @@ namespace ClickSphere_API.Services
             }
         }
 
-        /**
-         * Execute a query on the ClickHouse database
-         * @param query The query to be executed
-         * @return A list of strings that represent the result of the query
-         */
+        /// <summary>
+        /// Execute a query on the ClickHouse database
+        /// </summary>
+        /// <param name="query">The query to be executed</param>
+        /// <returns>A list of strings that represent the result of the query</returns>
         public async Task<List<string>> ExecuteQuery(string query)
         {
             using var connection = CreateConnection();
@@ -103,11 +104,11 @@ namespace ClickSphere_API.Services
             return result;
         }
 
-        /**
-         * Execute a query on the ClickHouse database
-         * @param query The query to be executed
-         * @return A List of dictionary of <string, object> that represents the result of the query
-         */
+        /// <summary>
+        /// Execute a query on the ClickHouse database
+        /// </summary>
+        /// <param name="query">The query to be executed</param>
+        /// <returns>A List of dictionary of <string, object> that represents the result of the query</returns>
         public async Task<List<Dictionary<string, object>>> ExecuteQueryDictionary(string query)
         {
             using var connection = CreateConnection();
@@ -128,11 +129,12 @@ namespace ClickSphere_API.Services
             return result;
         }
 
-        /**
-         * Execute a query on the ClickHouse database which returns an object
-         * @param query The query to be executed
-         * @return T The result of the query
-        */
+        /// <summary>
+        /// Execute a query on the ClickHouse database which returns an object
+        /// </summary>
+        /// <param name="query">The query to be executed</param>
+        /// <typeparam name="T">The type of the object</typeparam>
+        /// <returns>The result of the query</returns>
         public async Task<T> ExecuteQueryObject<T>(string query) where T : class, new()
         {
             using var connection = CreateConnection();
@@ -152,11 +154,12 @@ namespace ClickSphere_API.Services
             return result;
         }
 
-        /**
-        * Execute a query on the ClickHouse database
-        * @param query The query to be executed
-        * @return A List of T that represents the result of the query
-        */
+        /// <summary>
+        /// Execute a query on the ClickHouse database
+        /// </summary>
+        /// <param name="query">The query to be executed</param>
+        /// <typeparam name="T">The type of the object</typeparam>
+        /// <returns>A List of T that represents the result of the query</returns>
         public async Task<List<T>> ExecuteQueryList<T>(string query) where T : class, new()
         {
             using var connection = CreateConnection();
@@ -178,10 +181,11 @@ namespace ClickSphere_API.Services
             return result;
         }
 
-        /**
-         * Execute a non-query on the ClickHouse database
-         * @param query The query to be executed
-         */
+        /// <summary>
+        /// Execute a non-query on the ClickHouse database
+        /// </summary>
+        /// <param name="query">The query to be executed</param>
+        /// <returns>The number of rows affected</returns>
         public async Task<int> ExecuteNonQuery(string query)
         {
             using var connection = CreateConnection();
@@ -190,11 +194,11 @@ namespace ClickSphere_API.Services
             return await command.ExecuteNonQueryAsync();
         }
 
-        /**
-         * Execute a scalar query on the ClickHouse database
-         * @param query The query to be executed
-         * @return The result of the query
-         */
+        /// <summary>
+        /// Execute a scalar query on the ClickHouse database
+        /// </summary>
+        /// <param name="query">The query to be executed</param>
+        /// <returns>The result of the query</returns>
         public async Task<object?> ExecuteScalar(string query)
         {
             using var connection = CreateConnection();
@@ -204,9 +208,9 @@ namespace ClickSphere_API.Services
             return result ?? DBNull.Value;
         }
 
-        /**
-        * Initialize the ClickSphere database and create the required tables
-        */
+        /// <summary>
+        /// Initialize the ClickSphere database and create the required tables
+        /// </summary>
         public async Task InitializeDatabase()
         {
             //DeleteDatabase().Wait();
@@ -221,9 +225,9 @@ namespace ClickSphere_API.Services
             await ExecuteNonQuery(query);
         }
 
-        /**
-        * Delete the ClickSphere database
-        */
+        /// <summary>
+        /// Delete the ClickSphere database
+        /// </summary>
         public async Task DeleteDatabase()
         {
             string query = "DROP DATABASE IF EXISTS ClickSphere";
