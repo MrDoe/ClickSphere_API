@@ -1,8 +1,9 @@
-namespace ClickSphere_API.Models
+using System.Text.Json.Serialization;
+namespace ClickSphere_API.Models;
+public class UserRole
 {
-    public class UserRole
-    {
-        public required Guid RoleId { get; set; }
-        public required string RoleName { get; set; }
-    }
+    [JsonPropertyName("id")]
+    public required Guid Id { get; set; }
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
 }

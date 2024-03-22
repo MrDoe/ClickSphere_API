@@ -6,6 +6,7 @@ public interface IApiRoleService
     Task<Result> CreateRole(string roleName);
     Task<Result> DeleteRole(string roleName);
     Task<List<UserRole>> GetRoles();
+    Task<UserRole?> GetRoleById(Guid roleId);
     Task<UserRole?> GetRoleFromUser(string userName);
     Task<Result> AssignRoleToUser(string userName, string roleName);
     Task<Result> RemoveRoleFromUser(string userName, string roleName);

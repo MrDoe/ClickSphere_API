@@ -6,14 +6,9 @@ namespace ClickSphere_API.Services
     /// <summary>
     /// This class provides methods for managing roles in the ClickHouse database system.
     /// </summary>
-    public class ApiRoleService : IApiRoleService
+    public class ApiRoleService(IDbService dbService) : IApiRoleService
     {
-        private readonly IDbService dbService;
-
-        public ApiRoleService(IDbService dbService)
-        {
-            this.dbService = dbService;
-        }
+        private readonly IDbService dbService = dbService;
 
         /// <summary>
         /// Creates a new role in the ClickHouse database system.
@@ -64,11 +59,30 @@ namespace ClickSphere_API.Services
 
             List<UserRole> roles = result.Select(row => new UserRole
             {
-                RoleId = Guid.Parse(row["id"].ToString()!),
-                RoleName = row["name"].ToString()!
+                Id = Guid.Parse(row["id"].ToString()!),
+                Name = row["name"].ToString()!
             }).ToList();
 
             return roles;
+        }
+
+        /// <summary>
+        /// Get role by its id.
+        /// </summary>
+        /// <param name="roleId">The id of the role.</param>
+        /// <returns>The role with the given id.</returns>
+        public async Task<UserRole?> GetRoleById(Guid roleId)
+        {
+            string query = $"SELECT name FROM system.roles WHERE id = '{roleId}'";
+            var result = await dbService.ExecuteScalar(query);
+            if (result is DBNull)
+                return null;
+
+            return new UserRole
+            {
+                Id = roleId,
+                Name = result?.ToString()!
+            };
         }
 
         /// <summary>
@@ -82,8 +96,8 @@ namespace ClickSphere_API.Services
             var result = await dbService.ExecuteQueryDictionary(query);
             var role = result.Select(row => new UserRole
             {
-                RoleId = Guid.Parse(row["granted_role_id"].ToString()!),
-                RoleName = row["granted_role_name"].ToString()!
+                Id = Guid.Parse(row["granted_role_id"].ToString()!),
+                Name = row["granted_role_name"].ToString()!
             }).FirstOrDefault();
 
             return role;

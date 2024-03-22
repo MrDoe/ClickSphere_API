@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using ClickSphere_API.Models;
 using ClickSphere_API.Services;
 using ClickSphere_API.Tools;
@@ -30,15 +28,15 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
             return Results.BadRequest(result.Output);
     }
 
-    /**
-    * Delete a role from the ClickHouse database system
-    * @param roleName The name of the role to delete
-    * @return True if the role was deleted, otherwise false
-    */
+    /// <summary>
+    /// Delete a role from the ClickHouse database system
+    /// </summary>
+    /// <param name="roleName">The name of the role to delete</param>
+    /// <returns>True if the role was deleted, otherwise false</returns>
     [Authorize]
-    [HttpPost]
+    [HttpDelete]
     [Route("/deleteRole")]
-    public async Task<IResult> DeleteRole([FromBody] string roleName)
+    public async Task<IResult> DeleteRole(string roleName)
     {
         if (string.IsNullOrEmpty(roleName))
             return Results.BadRequest("Role name is required");
@@ -111,8 +109,24 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
     [Authorize]
     [HttpGet]
     [Route("/getUserRole")]
-    public async Task<UserRole> GetUserRole(string userName)
+    public async Task<UserRole?> GetUserRole(string userName)
     {
-        return await RoleService.GetRoleFromUser(userName);
+        if (string.IsNullOrEmpty(userName))
+            return null;
+
+        return await RoleService.GetRoleFromUser(userName) ?? null;
+    }
+
+    /// <summary>
+    /// Get role by its id
+    /// </summary>
+    /// <param name="id">The id of the role</param>
+    /// <returns>The role with the given id</returns>
+    [Authorize]
+    [HttpGet]
+    [Route("/getRoleById")]
+    public async Task<UserRole?> GetRoleById(Guid id)
+    {
+        return await RoleService.GetRoleById(id) ?? null;
     }
 }
