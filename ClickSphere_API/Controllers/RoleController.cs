@@ -1,4 +1,5 @@
 using ClickSphere_API.Models;
+using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Services;
 using ClickSphere_API.Tools;
 using Microsoft.AspNetCore.Authorization;
@@ -128,5 +129,18 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
     public async Task<UserRole?> GetRoleById(Guid id)
     {
         return await RoleService.GetRoleById(id) ?? null;
+    }
+
+    /// <summary>
+    /// Get views for role
+    /// </summary>
+    /// <param name="roleName">The name of the role</param>
+    /// <returns>The views for the role</returns>
+    [Authorize]
+    [HttpGet]
+    [Route("/getViewsForRole")]
+    public async Task<List<ViewsForRole>> GetViewsForRole(string roleName)
+    {
+        return await RoleService.GetViewsForRole(roleName) ?? null;
     }
 }

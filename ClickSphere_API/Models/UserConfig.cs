@@ -27,5 +27,8 @@ namespace ClickSphere_API.Models
 
         [JsonPropertyName("department")]
         public string? Department { get; set; }
+
+        [JsonPropertyName("role")]
+        public string? Role { get; set; }
     }
 }

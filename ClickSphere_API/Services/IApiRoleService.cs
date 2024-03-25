@@ -1,5 +1,6 @@
 using ClickSphere_API.Tools;
 using ClickSphere_API.Models;
+using ClickSphere_API.Models.Requests;
 namespace ClickSphere_API.Services;
 public interface IApiRoleService
 {
@@ -10,4 +11,5 @@ public interface IApiRoleService
     Task<UserRole?> GetRoleFromUser(string userName);
     Task<Result> AssignRoleToUser(string userName, string roleName);
     Task<Result> RemoveRoleFromUser(string userName, string roleName);
+    Task<List<ViewsForRole>> GetViewsForRole(string roleName);
 }

@@ -1,12 +1,14 @@
 using ClickSphere_API.Tools;
 using ClickSphere_API.Models;
+using ClickSphere_API.Models.Requests;
+using System.Text.RegularExpressions;
 
 namespace ClickSphere_API.Services
 {
     /// <summary>
     /// This class provides methods for managing roles in the ClickHouse database system.
     /// </summary>
-    public class ApiRoleService(IDbService dbService) : IApiRoleService
+    public partial class ApiRoleService(IDbService dbService) : IApiRoleService
     {
         private readonly IDbService dbService = dbService;
 
@@ -142,5 +144,55 @@ namespace ClickSphere_API.Services
             }
             return Result.Ok();
         }
+
+        /// <summary>
+        /// Assign a view to a role.
+        /// <summary>
+        /// <param name="roleName">The name of the role.</param>
+        /// <param name="viewId">The id of the view.</param>
+        /// <returns>True if the view was assigned, otherwise false.</returns>
+        public async Task<Result> AssignViewToRole(string roleName, string viewId)
+        {
+            string query = $"GRANT SELECT ON `{viewId}` TO ROLE `{roleName}`";
+            try
+            {
+                await dbService.ExecuteNonQuery(query);
+            }
+            catch (Exception)
+            {
+                return Result.BadRequest("Could not assign view to role");
+            }
+            return Result.Ok();
+        }
+
+        /// <summary>
+        /// Get all granted views for role.
+        /// </summary>
+        /// <param name="roleName">The name of the role.</param>
+        /// <returns>The views for the role.</returns>
+        public async Task<List<ViewsForRole>> GetViewsForRole(string roleName)
+        {
+            string query = $"SHOW GRANTS FOR `{roleName}`";
+            List<string> result = await dbService.ExecuteQuery(query);
+
+            // parse with Regex to get Database and View
+            List<ViewsForRole> views = [];
+            foreach (var row in result)
+            {
+                Match match = RegExParseViews().Match(row);
+                if (match.Success)
+                {
+                    views.Add(new ViewsForRole
+                    {
+                        Database = match.Groups["database"].Value,
+                        ViewID = match.Groups["view"].Value
+                    });
+                }
+            }
+            return views;
+        }
+
+        [GeneratedRegex(@"^GRANT SELECT ON (?<database>\w+)\.(?<view>\w+).*$")]
+        private static partial Regex RegExParseViews();
     }
 }
