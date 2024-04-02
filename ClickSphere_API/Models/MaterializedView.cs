@@ -1,5 +1,4 @@
-﻿using ClickSphere_API.Models;
-namespace ClickSphere_API;
+﻿namespace ClickSphere_API.Models;
 
 public class MaterializedView : View
 {

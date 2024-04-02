@@ -1,5 +1,4 @@
-﻿namespace ClickSphere_API;
-
+﻿namespace ClickSphere_API.Models;
 public enum EngineType
 {
     MergeTree,

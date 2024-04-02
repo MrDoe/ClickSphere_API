@@ -1,4 +1,4 @@
-﻿namespace ClickSphere_API.Models;
+﻿namespace ClickSphere_API.Models.Requests;
 public class LoginRequestResponse
 {
     public string? tokenType { get; set; }

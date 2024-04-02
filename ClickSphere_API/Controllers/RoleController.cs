@@ -139,8 +139,28 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
     [Authorize]
     [HttpGet]
     [Route("/getViewsForRole")]
-    public async Task<List<ViewsForRole>?> GetViewsForRole(string roleName)
+    public async Task<List<GetViewsForRoleRequest>?> GetViewsForRole(string roleName)
     {
         return await RoleService.GetViewsForRole(roleName) ?? null;
+    }
+
+    /// <summary>
+    /// Add a view to a role
+    /// </summary>
+    /// <param name="request">The request containing the role name, view id, and database</param>
+    /// <returns>True if the view was added, otherwise false</returns>
+    [Authorize]
+    [HttpPost]
+    [Route("/addViewToRole")]
+    public async Task<IResult> AddViewToRole([FromBody] AddViewToRoleRequest request)
+    {
+        if (string.IsNullOrEmpty(request.RoleName) || string.IsNullOrEmpty(request.ViewId) || string.IsNullOrEmpty(request.Database))
+            return Results.BadRequest("Role name, view id, and database are required");
+
+        Result result = await RoleService.AddViewToRole(request.RoleName, request.ViewId, request.Database);
+        if (result.IsSuccessful)
+            return Results.Ok();
+        else
+            return Results.BadRequest(result.Output);
     }
 }

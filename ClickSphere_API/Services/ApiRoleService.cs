@@ -146,14 +146,15 @@ namespace ClickSphere_API.Services
         }
 
         /// <summary>
-        /// Assign a view to a role.
+        /// Grant select permission of a view to a role.
         /// <summary>
         /// <param name="roleName">The name of the role.</param>
         /// <param name="viewId">The id of the view.</param>
+        /// <param name="database">The name of the view's database.</param>
         /// <returns>True if the view was assigned, otherwise false.</returns>
-        public async Task<Result> AssignViewToRole(string roleName, string viewId)
+        public async Task<Result> AddViewToRole(string roleName, string viewId, string database)
         {
-            string query = $"GRANT SELECT ON `{viewId}` TO ROLE `{roleName}`";
+            string query = $"GRANT SELECT ON `{database}`.`{viewId}` TO ROLE `{roleName}`";
             try
             {
                 await dbService.ExecuteNonQuery(query);
@@ -170,19 +171,19 @@ namespace ClickSphere_API.Services
         /// </summary>
         /// <param name="roleName">The name of the role.</param>
         /// <returns>The views for the role.</returns>
-        public async Task<List<ViewsForRole>> GetViewsForRole(string roleName)
+        public async Task<List<GetViewsForRoleRequest>> GetViewsForRole(string roleName)
         {
             string query = $"SHOW GRANTS FOR `{roleName}`";
             List<string> result = await dbService.ExecuteQuery(query);
 
             // parse with Regex to get Database and View
-            List<ViewsForRole> views = [];
+            List<GetViewsForRoleRequest> views = [];
             foreach (var row in result)
             {
                 Match match = RegExParseViews().Match(row);
                 if (match.Success)
                 {
-                    views.Add(new ViewsForRole
+                    views.Add(new GetViewsForRoleRequest
                     {
                         Database = match.Groups["database"].Value,
                         ViewID = match.Groups["view"].Value
