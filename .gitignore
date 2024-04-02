@@ -266,3 +266,4 @@ MigrationBackup/
 FodyWeavers.xml
 
 obj/
+ClickSphere_API/appsettings.json

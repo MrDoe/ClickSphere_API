@@ -139,7 +139,7 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
     [Authorize]
     [HttpGet]
     [Route("/getViewsForRole")]
-    public async Task<List<ViewsForRole>> GetViewsForRole(string roleName)
+    public async Task<List<ViewsForRole>?> GetViewsForRole(string roleName)
     {
         return await RoleService.GetViewsForRole(roleName) ?? null;
     }
