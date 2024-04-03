@@ -105,17 +105,17 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
     /// <summary>
     /// Retrieve the roles associated with a user
     /// </summary>
-    /// <param name="userName">The user name of the user</param>
+    /// <param name="username">The user name of the user</param>
     /// <returns>A list of strings representing the roles associated with the user</returns>
     [Authorize]
     [HttpGet]
     [Route("/getUserRole")]
-    public async Task<UserRole?> GetUserRole(string userName)
+    public async Task<UserRole?> GetUserRole(string username)
     {
-        if (string.IsNullOrEmpty(userName))
+        if (string.IsNullOrEmpty(username))
             return null;
 
-        return await RoleService.GetRoleFromUser(userName) ?? null;
+        return await RoleService.GetRoleFromUser(username) ?? null;
     }
 
     /// <summary>
@@ -139,7 +139,7 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
     [Authorize]
     [HttpGet]
     [Route("/getViewsForRole")]
-    public async Task<List<GetViewsForRoleRequest>?> GetViewsForRole(string roleName)
+    public async Task<List<View>?> GetViewsForRole(string roleName)
     {
         return await RoleService.GetViewsForRole(roleName) ?? null;
     }
@@ -158,6 +158,47 @@ public class RoleController(IApiRoleService RoleService) : ControllerBase
             return Results.BadRequest("Role name, view id, and database are required");
 
         Result result = await RoleService.AddViewToRole(request.RoleName, request.ViewId, request.Database);
+        if (result.IsSuccessful)
+            return Results.Ok();
+        else
+            return Results.BadRequest(result.Output);
+    }
+
+    /// <summary>
+    /// Remove a view from a role
+    /// </summary>
+    /// <param name="request">The request containing the role name, view id, and database</param>
+    /// <returns>True if the view was removed, otherwise false</returns>
+    [Authorize]
+    [HttpPost]
+    [Route("/removeViewFromRole")]
+    public async Task<IResult> RemoveViewFromRole([FromBody] AddViewToRoleRequest request)
+    {
+        if (string.IsNullOrEmpty(request.RoleName) || string.IsNullOrEmpty(request.ViewId) || string.IsNullOrEmpty(request.Database))
+            return Results.BadRequest("Role name, view id, and database are required");
+
+        Result result = await RoleService.RemoveViewFromRole(request.RoleName, request.ViewId, request.Database);
+        if (result.IsSuccessful)
+            return Results.Ok();
+        else
+            return Results.BadRequest(result.Output);
+    }
+
+    /// <summary>
+    /// Revoke all roles from a view
+    /// </summary>
+    /// <param name="database">The name of the view's database</param>
+    /// <param name="viewId">The id of the view</param>
+    /// <returns>True if the roles were revoked, otherwise false</returns>
+    [Authorize]
+    [HttpDelete]
+    [Route("/revokeRolesFromView")]
+    public async Task<IResult> RevokeRolesFromView(string database, string viewId)
+    {
+        if (string.IsNullOrEmpty(viewId) || string.IsNullOrEmpty(database))
+            return Results.BadRequest("View id and database are required");
+
+        Result result = await RoleService.RevokeRolesFromView(database, viewId);
         if (result.IsSuccessful)
             return Results.Ok();
         else

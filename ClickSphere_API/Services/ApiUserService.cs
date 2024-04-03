@@ -21,14 +21,21 @@ namespace ClickSphere_API.Services
         public async Task<Result> CreateUser(string username, string password)
         {
             // check if user exists
-            string query = $"SELECT name FROM system.users WHERE name = '{username}'";
+            string query = $"SELECT UserName FROM ClickSphere.Users WHERE UserName = '{username}'";
             var result = await _dbService.ExecuteScalar(query);
             if (result is not DBNull)
                 return Result.BadRequest("User already exists");
 
             // create the user
-            query = $"CREATE USER {username} IDENTIFIED BY '{password}'";
-            await _dbService.ExecuteNonQuery(query);
+            try
+            {
+                query = $"CREATE USER {username} IDENTIFIED BY '{password}'";
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+                // continue
+            }
 
             // get the new user's id
             query = $"SELECT id FROM system.users WHERE name = '{username}'";
@@ -71,10 +78,19 @@ namespace ClickSphere_API.Services
         {
             if (await _dbService.CheckLogin(username, password))
             {
+                // get user's role
+                string query = $"SELECT granted_role_name FROM system.role_grants WHERE user_name = '{username}'";
+                var result = await _dbService.ExecuteScalar(query);
+                string? role = result?.ToString()!;
+                if (role == null)
+                    return null;
+
                 var claimsPrincipal = new ClaimsPrincipal(
                   new ClaimsIdentity(
                     [new Claim(ClaimTypes.Name, username)],
-                    BearerTokenDefaults.AuthenticationScheme
+                    BearerTokenDefaults.AuthenticationScheme,
+                    ClaimTypes.Name,
+                    role
                   ));
                 return claimsPrincipal;
             }
@@ -87,7 +103,7 @@ namespace ClickSphere_API.Services
         /// <returns>A list of User objects representing the users in the table</returns>
         public async Task<List<UserConfig>> GetUsers()
         {
-            string query = "SELECT toString(Id) as Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department from ClickSphere.Users";
+            string query = "SELECT toString(Id) as Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department, Role from ClickSphere.Users";
             var result = await _dbService.ExecuteQueryDictionary(query);
 
             List<UserConfig> users = [];
@@ -102,7 +118,8 @@ namespace ClickSphere_API.Services
                     FirstName = row["FirstName"]?.ToString()!,
                     LastName = row["LastName"]?.ToString()!,
                     Phone = row["Phone"]?.ToString()!,
-                    Department = row["Department"]?.ToString()!
+                    Department = row["Department"]?.ToString()!,
+                    Role = row["Role"]?.ToString()!
                 };
 
                 users.Add(user);
@@ -196,9 +213,47 @@ namespace ClickSphere_API.Services
                            $"LastName = '{user.LastName}'," +
                            $"Email = '{user.Email}'," +
                            $"Phone = '{user.Phone}'," +
-                           $"Department = '{user.Department}' " +
+                           $"Department = '{user.Department}'," +
+                           $"Role = '{user.Role}'" +
                            $"WHERE Id = '{user.Id}'";
             var nReturn = await _dbService.ExecuteNonQuery(query);
+
+            // get previous role
+            query = $"SELECT Role FROM ClickSphere.Users WHERE Id = '{user.Id}'";
+            var result = await _dbService.ExecuteScalar(query);
+            string? previousRole = result?.ToString()!;
+
+            // remove previous role
+            query = $"REVOKE {previousRole} FROM {user.Username}";
+            try
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+                // don't catch exception
+            }
+
+            // update role
+            query = $"GRANT {user.Role} TO {user.Username}";
+            try
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+                return Result.BadRequest("Could not update role");
+            }
+
+            query = $"SET DEFAULT ROLE {user.Role} TO {user.Username}";
+            try
+            {
+                await _dbService.ExecuteNonQuery(query);
+            }
+            catch(Exception)
+            {
+                return Result.BadRequest("Could not update role");
+            }
             return nReturn == 0 ? Result.Ok() : Result.BadRequest("Could not update user");
         }
     }
