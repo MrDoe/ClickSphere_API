@@ -19,7 +19,21 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 6.0.x
+        dotnet-version: 8.0.x
+    - name: Submodule Sync
+      # You may pin to the exact commit or the version.
+      # uses: mheap/submodule-sync-action@a06903a4e38f042f6f52cc88d184ec1c930ee12d
+      uses: ClickHouseClient/submodule-sync-action@v1
+      with:
+        # The path in the repo to update
+        path: ClickHouseClient
+        # The branch name to check for updates in the remote repo
+        ref: main
+        # The name of the branch to use when creating a pull request
+        pr_branch: main
+        # The name of the branch that the PR should be raised against
+        target_branch: main
+        # The name of the branch that the PR should be based on          
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
