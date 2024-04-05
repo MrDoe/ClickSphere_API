@@ -85,7 +85,7 @@ namespace ClickSphere_API.Services
             return MyRegex().IsMatch(name);
         }
 
-        [GeneratedRegex(@"^[\*a-zA-Z0-9_\s`'""@!=<>()%]+$")]
+        [GeneratedRegex(@"^[\*a-zA-Z0-9_\s`'""@!=<>()%\.]+$")]
         private static partial Regex MyRegex();
     }
 

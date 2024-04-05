@@ -9,6 +9,5 @@ namespace ClickSphere_API.Services
         Task<bool> CheckLogin(string user, string password);
         Task<T> ExecuteQueryObject<T>(string query) where T : class, new();
         Task<List<T>> ExecuteQueryList<T>(string query) where T : class, new();
-
     }
 }
