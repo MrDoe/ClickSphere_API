@@ -193,7 +193,8 @@ namespace ClickSphere_API.Services
                 LastName = row["LastName"].ToString()!,
                 Email = row["Email"].ToString()!,
                 Phone = row["Phone"].ToString()!,
-                Department = row["Department"].ToString()!
+                Department = row["Department"].ToString()!,
+                Role = row["Role"].ToString()!
             }).FirstOrDefault();
 
             return userConfig;
