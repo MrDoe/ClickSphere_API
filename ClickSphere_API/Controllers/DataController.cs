@@ -24,7 +24,14 @@ namespace ClickSphere_API.Controllers
         public async Task<IEnumerable<Dictionary<string, object>>> CustomQuery([FromBody] string query)
         {
             // decode base64 string
-            query = Encoding.UTF8.GetString(Convert.FromBase64String(query));
+            try 
+            {
+                query = Encoding.UTF8.GetString(Convert.FromBase64String(query));
+            }
+            catch (Exception e)
+            {
+                return [new Dictionary<string, object> { { "error", "Invalid base64 string\n" + e.Message  } }];
+            }
 
             // validate and sanitize the input
             var parsedQuery = sqlParser.Parse(query);
