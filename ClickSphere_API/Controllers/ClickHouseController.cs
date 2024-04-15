@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ClickSphere_API.Services;
 
@@ -16,7 +15,6 @@ namespace ClickSphere_API.Controllers
         /// Get the version of the ClickHouse server.
         /// </summary>
         /// <returns>The version of the server.</returns>
-        [Authorize]
         [HttpGet]
         [Route("/version")]
         public async Task<string> GetVersion()
