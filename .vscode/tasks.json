@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/ClickSphere.sln",
+                "${workspaceFolder}/ClickSphere_API.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/ClickSphere.sln",
+                "${workspaceFolder}/ClickSphere_API.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/ClickSphere.sln"
+                "${workspaceFolder}/ClickSphere_API.sln"
             ],
             "problemMatcher": "$msCompile"
         }

@@ -40,7 +40,14 @@ public class DbService : IDbService
             Database = configuration["ClickHouse:Database"],
         } ?? throw new Exception("ClickHouse connection string is not valid");
 
-        InitializeDatabase().Wait();
+        try
+        {
+            InitializeDatabase().Wait();
+        }
+        catch(Exception ex)
+        {
+            throw new Exception("Database server is not running!\n" + ex.Message);
+        }
     }
 
     /// <summary>
