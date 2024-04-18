@@ -44,9 +44,9 @@ public class DbService : IDbService
         {
             InitializeDatabase().Wait();
         }
-        catch(Exception ex)
+        catch(Exception)
         {
-            throw new Exception("Database server is not running!\n" + ex.Message);
+            throw new Exception("Database server is not accessible! Please check, if it is running.\n");
         }
     }
 

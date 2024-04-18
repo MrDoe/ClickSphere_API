@@ -8,7 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "ClickSphere API", Version = "v1" });
+    var filePath = Path.Combine(AppContext.BaseDirectory, "ClickSphere_API.xml");
+    c.IncludeXmlComments(filePath);
 
     // Define the BearerAuth security scheme
     var securityScheme = new OpenApiSecurityScheme
@@ -46,6 +48,7 @@ builder.Services.AddScoped<IApiUserService, ApiUserService>();
 builder.Services.AddScoped<IApiRoleService, ApiRoleService>();
 builder.Services.AddScoped<IApiViewServices, ApiViewServices>();
 builder.Services.AddScoped<ISqlParser, SqlParser>();
+builder.Services.AddScoped<IAiService, AiService>();
 
 // read token expiration from configuration
 var config = builder.Configuration.GetSection("BearerToken");
