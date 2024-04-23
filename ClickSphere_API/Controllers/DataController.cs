@@ -18,7 +18,7 @@ namespace ClickSphere_API.Controllers
         /// </summary>
         /// <param name="query">The query to be executed.</param>
         /// <returns>The result of the query.</returns>
-        [Authorize]
+        //[Authorize]
         [HttpPost]
         [Route("/customQuery")]
         public async Task<IEnumerable<Dictionary<string, object>>> CustomQuery([FromBody] string query)

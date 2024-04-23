@@ -84,6 +84,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "ClickSphere API V1");
+        c.EnableTryItOutByDefault();
     });
 }
 
