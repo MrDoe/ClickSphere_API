@@ -45,7 +45,7 @@ public partial class AiService(IDbService dbService) : IAiService
         
         OllamaRequest request = new()
         {
-            model = "tinyllama",
+            model = "codegemma",
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -132,7 +132,7 @@ public partial class AiService(IDbService dbService) : IAiService
 
         var request = new OllamaRequest
         {
-            model = "tinyllama",
+            model = "codellama",
             system = SystemPrompt + tableDefinition + "`",
             prompt = question + PromptAddition,
             stream = false
@@ -198,7 +198,7 @@ public partial class AiService(IDbService dbService) : IAiService
         }
         catch (Exception e)
         {
-            return e.Message + "\n\n Query: " + query;
+            return e.Message + "\n\nQuery: " + query;
         }
     }
 }

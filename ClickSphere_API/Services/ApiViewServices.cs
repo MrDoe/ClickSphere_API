@@ -1,5 +1,10 @@
 using ClickSphere_API.Models;
 namespace ClickSphere_API.Services;
+
+/// <summary>
+/// Service class for handling view operations.
+/// </summary>
+/// <param name="dbService"></param>
 public class ApiViewServices(IDbService dbService) : IApiViewServices
 {
     private readonly IDbService _dbService = dbService;

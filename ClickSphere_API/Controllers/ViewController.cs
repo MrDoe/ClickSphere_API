@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models;
 namespace ClickSphere_API.Controllers;
+/// <summary>
+/// Controller class for managing views in the ClickSphere database system
+/// </summary>
 [ApiController]
 public class ViewController(IApiViewServices viewServices) : ControllerBase
 {
@@ -24,9 +27,7 @@ public class ViewController(IApiViewServices viewServices) : ControllerBase
     /// <summary>
     /// Create materialized view in the specified database
     /// </summary>
-    /// <param name="database">The database where the materialized view should be created</param>
-    /// <param name="viewName">The name of the materialized view to create</param>
-    /// <param name="query">The query that defines the materialized view</param>
+    /// <param name="view">The materialized view to create</param>
     /// <returns>The result of the materialized view creation</returns>
     [Authorize]
     [HttpPost]

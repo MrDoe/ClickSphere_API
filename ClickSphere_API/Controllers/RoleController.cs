@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace ClickSphere_API.Controllers;
 
+/// <summary>
+/// Controller class for managing roles in the ClickSphere database system
+/// </summary>
+/// <param name="RoleService"></param>
 [ApiController]
 public class RoleController(IApiRoleService RoleService) : ControllerBase
 {

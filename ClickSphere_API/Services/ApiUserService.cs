@@ -130,7 +130,7 @@ namespace ClickSphere_API.Services
         /// <summary>
         /// This method deletes a user
         /// </summary>
-        /// <param name="userName">The user name of the user</param>
+        /// <param name="username">The user name of the user</param>
         /// <returns>True if the user was deleted, otherwise false</returns>
         public async Task<Result> DeleteUser(string username)
         {
@@ -178,7 +178,7 @@ namespace ClickSphere_API.Services
         /// <summary>
         /// This method gets the user configuration from ClickSphere.Users
         /// </summary>
-        /// <param name="userName">The user name of the user</param>
+        /// <param name="userId">The user name of the user</param>
         /// <returns>The user configuration</returns>
         public async Task<UserConfig?> GetUserConfig(Guid userId)
         {

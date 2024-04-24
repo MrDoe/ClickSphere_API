@@ -17,7 +17,7 @@ public class UserController(IApiUserService userService) : ControllerBase
     /// <summary>
     /// This method is used to log in a user.
     /// </summary>
-    /// <param name="model">The user to log in.</param>
+    /// <param name="user">The request containing the username and password.</param>
     /// <returns>The result of the login.</returns>
     [AllowAnonymous]
     [HttpPost]
@@ -59,7 +59,7 @@ public class UserController(IApiUserService userService) : ControllerBase
     /// <summary>
     /// Create new user in the ClickSphere users table
     /// </summary>
-    /// <param name="model">The user to create</param>
+    /// <param name="user">The user to create</param>
     /// <returns>The result of the creation</returns>
     [Authorize]
     [HttpPost]

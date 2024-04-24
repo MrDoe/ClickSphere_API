@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 namespace ClickSphere_API.Controllers;
+
 /// <summary>
-/// The base class for ClickSphere API controllers.
+/// Controller class for managing tables in the ClickSphere database system
 /// </summary>
 [ApiController]
 public class TableController(IDbService dbService) : ControllerBase
@@ -14,10 +15,8 @@ public class TableController(IDbService dbService) : ControllerBase
     /// <summary>
     /// Create a new table in the specified database
     /// </summary>
-    /// <param name="database">The database where the table should be created</param>
-    /// <param name="tableName">The name of the table to create</param>
-    /// <param name="columns">The columns of the table in the format "column1 datatype, column2 datatype, ..."</param>
-    /// <returns>The result of the table creation</returns>
+    /// <param name="request">The request to create a table.</param>
+    /// <returns>The result of the table creation.</returns>
     [Authorize]
     [HttpPost]
     [Route("/createTable")]
@@ -78,9 +77,7 @@ public class TableController(IDbService dbService) : ControllerBase
     /// <summary>
     /// Get the first n rows from a table.
     /// </summary>
-    /// <param name="database">The database where the table is located.</param>
-    /// <param name="table">The table to get the rows from.</param>
-    /// <param name="limit">The number of rows to get.</param>
+    /// <param name="request">The request containing the database, table, columns, order by, and limit.</param>
     /// <returns>The first n rows from the table.</returns>
     [Authorize]
     [HttpPost]
@@ -107,9 +104,7 @@ public class TableController(IDbService dbService) : ControllerBase
     /// <summary>
     /// Insert a row into a table.
     /// </summary>
-    /// <param name="database">The database where the table is located.</param>
-    /// <param name="table">The table to insert the row into.</param>
-    /// <param name="values">The values of the row in the format "value1, value2, ...".</param>
+    /// <param name="request">The request containing the database, table, and values to insert.</param>
     /// <returns>The result of the insertion.</returns>
     [Authorize]
     [HttpPost]
@@ -130,10 +125,7 @@ public class TableController(IDbService dbService) : ControllerBase
     /// <summary>
     /// Update a row in a table.
     /// </summary>
-    /// <param name="database">The database where the table is located.</param>
-    /// <param name="table">The table to update the row in.</param>
-    /// <param name="values">The new values of the row in the format "column1 = value1, column2 = value2, ...".</param>
-    /// <param name="condition">The condition that the row must satisfy.</param>
+    /// <param name="request">The request containing the database, table, values, and condition to update the row.</param>
     /// <returns>The result of the update.</returns>
     [Authorize]
     [HttpPost]
@@ -155,9 +147,7 @@ public class TableController(IDbService dbService) : ControllerBase
     /// <summary>
     /// Delete a row from a table.
     /// </summary>
-    /// <param name="database">The database where the table is located.</param>
-    /// <param name="table">The table to delete the row from.</param>
-    /// <param name="condition">The condition that the row must satisfy.</param>
+    /// <param name="request">The request containing the database, table, and condition to delete the row.</param>
     /// <returns>The result of the deletion.</returns>
     [Authorize]
     [HttpDelete]

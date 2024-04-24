@@ -148,7 +148,7 @@ public partial class ApiRoleService(IDbService dbService, IApiViewServices viewS
 
     /// <summary>
     /// Grant select permission of a view to a role.
-    /// <summary>
+    /// </summary>
     /// <param name="roleName">The name of the role.</param>
     /// <param name="viewId">The id of the view.</param>
     /// <param name="database">The name of the view's database.</param>
@@ -169,7 +169,7 @@ public partial class ApiRoleService(IDbService dbService, IApiViewServices viewS
 
     /// <summary>
     /// Revoke select permission of a view from a role.
-    /// <summary>
+    /// </summary>
     /// <param name="roleName">The name of the role.</param>
     /// <param name="viewId">The id of the view.</param>
     /// <param name="database">The name of the view's database.</param>
@@ -188,6 +188,7 @@ public partial class ApiRoleService(IDbService dbService, IApiViewServices viewS
         return Result.Ok();
     }
 
+    /// <summary>
     /// Get all granted views for role.
     /// </summary>
     /// <param name="roleName">The name of the role.</param>
@@ -195,7 +196,7 @@ public partial class ApiRoleService(IDbService dbService, IApiViewServices viewS
     public async Task<List<View>> GetViewsForRole(string roleName)
     {
         string query = $"SHOW GRANTS FOR `{roleName}`";
-        List<string> result = await dbService.ExecuteQuery(query);
+    List<string> result = await dbService.ExecuteQuery(query);
 
         // parse with Regex to get Database and View
         List<View> views = [];

@@ -113,7 +113,7 @@ public class DbService : IDbService
     /// Execute a query on the ClickHouse database
     /// </summary>
     /// <param name="query">The query to be executed</param>
-    /// <returns>A List of dictionary of <string, object> that represents the result of the query</returns>
+    /// <returns>A List of dictionary that represents the result of the query</returns>
     public async Task<List<Dictionary<string, object>>> ExecuteQueryDictionary(string query)
     {
         using var connection = CreateConnection();
