@@ -14,14 +14,15 @@ public partial class AiService(IDbService dbService) : IAiService
     private readonly string OllamaUrl = "http://localhost:11434";
     private readonly string OllamaApiPath = "/api/generate";
     private readonly string SystemPrompt = "You are an expert for ClickHouse database systems. Your task is to convert a question from the user to a ClickHouse SQL query. Don't explain, output the query text only. Use only valid ClickHouse SQL functions and datatypes. Use the following table schema: `";
-    private readonly string PromptPrefix = "Don't explain. Output the SQL query only. ";
+    private readonly string PromptAddition = " Don't explain. Output the SQL query only.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false,
+        WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
+    
     /// <summary>
     /// Ask a question regarding to ClickHouse databases
     /// </summary>
@@ -44,7 +45,7 @@ public partial class AiService(IDbService dbService) : IAiService
         
         OllamaRequest request = new()
         {
-            model = "codegemma",
+            model = "tinyllama",
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -119,7 +120,7 @@ public partial class AiService(IDbService dbService) : IAiService
 
         // Add an Accept header for JSON format
         client.DefaultRequestHeaders.Accept.Clear();
-        var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
+        var mediaType = new MediaTypeWithQualityHeaderValue("apsqlcoderplication/json");
         client.DefaultRequestHeaders.Accept.Add(mediaType);
 
         // Create the JSON string for the request
@@ -131,9 +132,9 @@ public partial class AiService(IDbService dbService) : IAiService
 
         var request = new OllamaRequest
         {
-            model = "codegemma",
+            model = "tinyllama",
             system = SystemPrompt + tableDefinition + "`",
-            prompt = PromptPrefix + question,
+            prompt = question + PromptAddition,
             stream = false
         };
 

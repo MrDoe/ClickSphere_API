@@ -1,4 +1,7 @@
 namespace ClickSphere_API.Models.Requests;
+/// <summary>
+/// Represents the response from the Ollama API.
+/// </summary>
 public class OllamaResponse
 {
     public required string model { get; set; }
@@ -7,6 +10,9 @@ public class OllamaResponse
     public required bool done { get; set; }
 }
 
+/// <summary>
+/// Represents the response from the Ollama API.
+/// </summary>
 public class Response
 {
     public string query { get; set; }
