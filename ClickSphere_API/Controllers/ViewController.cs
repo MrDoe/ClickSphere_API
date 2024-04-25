@@ -100,8 +100,21 @@ public class ViewController(IApiViewServices viewServices) : ControllerBase
     [Authorize]
     [HttpGet]
     [Route("/getViewColumns")]
-    public async Task<IEnumerable<Dictionary<string, object>>> GetViewColumns(string database, string viewId)
+    public async Task<IList<ViewColumns>> GetViewColumns(string database, string viewId)
     {
         return await ViewServices.GetViewColumns(database, viewId);
+    }
+
+    /// <summary>
+    /// Update configuration of a view column 
+    /// </summary>
+    /// <param name="columns">The columns to update</param>
+    /// <returns>The result of the column update</returns>
+    [Authorize]
+    [HttpPost]
+    [Route("/updateViewColumn")]
+    public async Task<IResult> UpdateViewColumn(ViewColumns columns)
+    {
+        return await ViewServices.UpdateViewColumn(columns);
     }
 }

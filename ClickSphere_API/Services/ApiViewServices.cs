@@ -155,10 +155,63 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
     /// <param name="database">The database to get the view from</param>
     /// <param name="viewId">The viewId to get the columns from</param>
     /// <returns>The columns of the view</returns>
-    public async Task<IList<Dictionary<string, object>>> GetViewColumns(string database, string viewId)
+    public async Task<IList<ViewColumns>> GetViewColumns(string database, string viewId)
     {
-        return await _dbService.ExecuteQueryDictionary($"SELECT name as `Column Name`, type as `Data Type` FROM system.columns WHERE table = '{viewId}' and database = '{database}'");
+        List<ViewColumns> columns;
+        
+        // try to get data from ViewColumns table
+        columns = await _dbService.ExecuteQueryList<ViewColumns>($"SELECT * FROM ClickSphere.ViewColumns WHERE Database = '{database}' AND ViewId = '{viewId}' order by Sorter");
+
+        if(columns.Count == 0)
+        {    
+            // insert data into viewColumns table
+            var viewCols = await _dbService.ExecuteQueryDictionary($"SELECT name as `Column Name`, type as `Data Type` FROM system.columns WHERE table = '{viewId}' and database = '{database}'");
+            
+            if(viewCols == null)
+                return [];
+            
+            int sorter = 0;
+            foreach (var col in viewCols)
+            {
+                string? controlType = col["Data Type"] switch
+                {
+                    "String" => "TextBox",
+                    "UInt8" or "UInt16" or "UInt32" or "UInt64" or "Int8" or "Int16" or "Int32" or "Int64" => "Numeric",
+                    "Float32" or "Float64" => "Numeric",
+                    "DateTime" or "DateTime64(3)" => "DateTime",
+                    _ => "TextBox",
+                };
+                string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter) " +
+                                     $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{col["Data Type"]}','{controlType}',{sorter});";
+
+                await _dbService.ExecuteNonQuery(insertQuery);
+                ++sorter;
+            }
+
+            // try to get data from ViewColumns table again
+            columns = await _dbService.ExecuteQueryList<ViewColumns>($"SELECT * FROM ClickSphere.ViewColumns WHERE Database = '{database}' AND ViewId = '{viewId}' order by Sorter");
+        }        
+        return columns;
     }
 
-
+    /// <summary>
+    /// Update view column configuration
+    /// </summary>
+    /// <param name="column">The column to update</param>
+    /// <returns>The result of the column update</returns>
+    public async Task<IResult> UpdateViewColumn(ViewColumns column)
+    {
+        string query = $"ALTER TABLE ClickSphere.ViewColumns " +
+                       $"UPDATE ControlType = '{column.ControlType}', " +
+                       $"DefaultValue = '{column.DefaultValue}', " +
+                       $"Sorter = {column.Sorter} " +
+                       $"WHERE Id = '{column.Id}';";
+        
+        int result = await _dbService.ExecuteNonQuery(query);
+        if (result == 0)
+            return Results.Ok();
+        else
+            return Results.BadRequest("Could not update column");
+    }
+    
 }

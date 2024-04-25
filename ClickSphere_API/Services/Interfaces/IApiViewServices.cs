@@ -55,5 +55,12 @@ public interface IApiViewServices
     /// <param name="database">The database name.</param>
     /// <param name="viewId">The view ID.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task<IList<Dictionary<string, object>>> GetViewColumns(string database, string viewId);
+    Task<IList<ViewColumns>> GetViewColumns(string database, string viewId);
+
+    /// <summary>
+    /// Update a view column configuration.
+    /// </summary>
+    /// <param name="column">The column to update.</param>
+    /// <returns>The result of the column update.</returns>
+    Task<IResult> UpdateViewColumn(ViewColumns column);
 }
