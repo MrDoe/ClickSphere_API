@@ -7,7 +7,7 @@ public class GetViewsForRoleRequest
     /// <summary>
     /// Gets or sets the ID of the view.
     /// </summary>
-    public string? ViewID { get; set; }
+    public string? ViewId { get; set; }
 
     /// <summary>
     /// Gets or sets the name of the database.

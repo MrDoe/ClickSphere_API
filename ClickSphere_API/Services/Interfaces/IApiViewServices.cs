@@ -63,4 +63,13 @@ public interface IApiViewServices
     /// <param name="column">The column to update.</param>
     /// <returns>The result of the column update.</returns>
     Task<IResult> UpdateViewColumn(ViewColumns column);
+
+    /// <summary>
+    /// Gets the distinct values of a column.
+    /// </summary>
+    /// <param name="database">The database name.</param>
+    /// <param name="viewId">The view ID.</param>
+    /// <param name="columnName">The column name.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task<IList<string>?> GetDistinctValues(string database, string viewId, string columnName);
 }

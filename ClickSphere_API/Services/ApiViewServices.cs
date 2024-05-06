@@ -203,7 +203,7 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
     {
         string query = $"ALTER TABLE ClickSphere.ViewColumns " +
                        $"UPDATE ControlType = '{column.ControlType}', " +
-                       $"DefaultValue = '{column.DefaultValue}', " +
+                       $"Placeholder = '{column.Placeholder}', " +
                        $"Sorter = {column.Sorter} " +
                        $"WHERE Id = '{column.Id}';";
         
@@ -212,6 +212,19 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
             return Results.Ok();
         else
             return Results.BadRequest("Could not update column");
+    }
+
+    /// <summary>
+    /// Get the distinct values of a column
+    /// </summary>
+    /// <param name="database">The database to get the data from</param>
+    /// <param name="viewId">The viewId to get the data from</param>
+    /// <param name="column">The column to get the distinct values from</param>
+    /// <returns>The distinct values of the column</returns>
+    public async Task<IList<string>> GetDistinctValues(string database, string viewId, string column)
+    {
+        var result = await _dbService.ExecuteQueryList<object>($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 100");
+        return result.Cast<string>().ToList();
     }
     
 }

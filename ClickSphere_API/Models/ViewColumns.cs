@@ -15,9 +15,9 @@ public class ViewColumns
     public string? Database { get; set; }
 
     /// <summary>
-    /// Gets or sets the ViewID.
+    /// Gets or sets the ViewId.
     /// </summary>
-    public string? ViewID { get; set; }
+    public string? ViewId { get; set; }
 
     /// <summary>
     /// Gets or sets the name of the column.
@@ -37,7 +37,7 @@ public class ViewColumns
     /// <summary>
     /// Gets or sets the default value.
     /// </summary>
-    public string? DefaultValue { get; set; }
+    public string? Placeholder { get; set; }
 
     /// <summary>
     /// Gets or sets the sorter.

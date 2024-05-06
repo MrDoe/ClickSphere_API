@@ -247,7 +247,7 @@ public class DbService : IDbService
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, DefaultValue String, Sorter UInt32) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
         await ExecuteNonQuery(query);
     }
 

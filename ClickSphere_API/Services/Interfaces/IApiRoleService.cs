@@ -67,19 +67,19 @@ public interface IApiRoleService
     /// Adds a view to a role.
     /// </summary>
     /// <param name="roleName">The name of the role.</param>
-    /// <param name="viewID">The ID of the view to add.</param>
+    /// <param name="viewId">The ID of the view to add.</param>
     /// <param name="database">The name of the database.</param>
     /// <returns>A task that represents the asynchronous operation and contains the result of the operation.</returns>
-    Task<Result> AddViewToRole(string roleName, string viewID, string database);
+    Task<Result> AddViewToRole(string roleName, string viewId, string database);
 
     /// <summary>
     /// Removes a view from a role.
     /// </summary>
     /// <param name="roleName">The name of the role.</param>
-    /// <param name="viewID">The ID of the view to remove.</param>
+    /// <param name="viewId">The ID of the view to remove.</param>
     /// <param name="database">The name of the database.</param>
     /// <returns>A task that represents the asynchronous operation and contains the result of the operation.</returns>
-    Task<Result> RemoveViewFromRole(string roleName, string viewID, string database);
+    Task<Result> RemoveViewFromRole(string roleName, string viewId, string database);
 
     /// <summary>
     /// Revokes all roles from a view.

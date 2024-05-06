@@ -13,7 +13,7 @@ public partial class AiService(IDbService dbService) : IAiService
     private readonly IDbService DbService = dbService;
     private readonly string OllamaUrl = "http://localhost:11434";
     private readonly string OllamaApiPath = "/api/generate";
-    private readonly string SystemPrompt = "You are an expert for ClickHouse database systems. Your task is to convert a question from the user to a ClickHouse SQL query. Don't explain, output the query text only. Use only valid ClickHouse SQL functions and datatypes. Use the following table schema: `";
+    private readonly string SystemPrompt = "You are an expert for ClickHouse database systems. Your task is to convert a question from the user to a ClickHouse SQL query. Don't explain, output the query text only. Only use valid ClickHouse SQL functions and datatypes. Use the following table schema: `";
     private readonly string PromptAddition = " Don't explain. Output the SQL query only.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {

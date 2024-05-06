@@ -117,4 +117,19 @@ public class ViewController(IApiViewServices viewServices) : ControllerBase
     {
         return await ViewServices.UpdateViewColumn(columns);
     }
+
+    /// <summary>
+    /// Get the distinct values of a column
+    /// </summary>
+    /// <param name="database">The database to get the data from</param>
+    /// <param name="viewId">The viewId to get the data from</param>
+    /// <param name="columnName">The column to get the distinct values from</param>
+    /// <returns>The distinct values of the column</returns>
+    [Authorize]
+    [HttpGet]
+    [Route("/getDistinctValues")]
+    public async Task<IList<string>> GetDistinctValues(string database, string viewId, string columnName)
+    {
+        return await ViewServices.GetDistinctValues(database, viewId, columnName);
+    }
 }
