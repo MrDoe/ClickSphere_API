@@ -1,0 +1,242 @@
+[
+    {
+        "question": "How many heads of the departments are older than 56?",
+        "context": "CREATE TABLE head (age Int64)",
+        "answer": "SELECT COUNT(*) FROM head WHERE age > 56"
+    },
+    {
+        "question": "What is the average salary of employees who were hired before 2015?",
+        "context": "CREATE TABLE employee (salary Float32, hire_date DateTime64)",
+        "answer": "SELECT AVG(salary) FROM employee WHERE hire_date < '2015-01-01'"
+    },
+    {
+        "question": "What is the total sales of products with price more than1000?",
+        "context": "CREATE TABLE product (price Int32, sales Float64)",
+        "answer": "SELECT SUM(sales) FROM product WHERE price > 1000"
+    },
+    {
+        "question": "What is the average order value for orders that were placed in Q3 2020?",
+        "context": "CREATE TABLE order (order_date DateTime64, total Float32)",
+        "answer": "SELECT AVG(total) FROM order WHERE toMonth(order_date) = 9 AND toYear(order_date) = 2020"
+    },
+    {
+        "question": "What is the number of customers who spent more than $500?",
+        "context": "CREATE TABLE customer (id Int64, spend Float32)",
+        "answer": "SELECT COUNT(*) FROM customer WHERE spend > 500"
+    },
+    {
+        "question": "What are the top 3 countries with the highest total sales?",
+        "context": "CREATE TABLE sale (country String, amount Float32)",
+        "answer": "SELECT country, SUM(amount) AS total_sales FROM sale GROUP BY country ORDER BY total_sales DESC LIMIT 3"
+    },
+    {
+        "question": "What is the average age of employees in department A?",
+        "context": "CREATE TABLE employee (age Int64, department String)",
+        "answer": "SELECT AVG(age) FROM employee WHERE department = 'A'"
+    },
+    {
+        "question": "What are the top 5 products with the highest sales?",
+        "context": "CREATE TABLE product (name String, sales Float64)",
+        "answer": "SELECT name, SUM(sales) AS total_sales FROM product GROUP BY name ORDER BY total_sales DESC LIMIT 5"
+    },
+    {
+        "question": "What is the number of employees who were hired in 2018?", 
+        "context": "CREATE TABLE employee (id Int64, hire_date DateTime64)",
+        "answer": "SELECT COUNT(*) FROM employee WHERE toYear(hire_date) = 2018" 
+    },
+    {
+        "question": "What is the average order value for orders that were placed in April?", 
+        "context": "CREATE TABLE order (order_date DateTime64, total Float32)", 
+        "answer": "SELECT AVG(total) FROM order WHERE toMonth(order_date) = 4" 
+    },
+    {
+        "question": "What are the top 3 customers with the highest spend?",
+        "context": "CREATE TABLE customer (id Int64, spend Float32)",
+        "answer": "SELECT id, SUM(spend) AS total_spend FROM customer GROUP BY id ORDER BY total_spend DESC LIMIT 3" 
+    },
+    {
+        "question": "What is the number of products with a price more than $500?", 
+        "context": "CREATE TABLE product (name String, price Float32)",
+        "answer": "SELECT COUNT(*) FROM product WHERE price > 500"
+    },
+    {
+        "question": "What are the top 2 departments with the highest averageage?", 
+        "context": "CREATE TABLE employee (age Int64, department String)",
+        "answer": "SELECT department, AVG(age) AS avg_age FROM employee GROUP BY department ORDER BY avg_age DESC LIMIT 2" 
+    },
+    {
+        "question": "What is the number of orders that were placed in Q1 20?", 
+        "context": "CREATE TABLE order (order_date DateTime64)",
+        "answer": "SELECT COUNT(*) FROM order WHERE toQuarter(order_date) = 1 AND toYear(order_date) = 2020" 
+    },
+    {
+        "question": "What is the average salary of employees in department B?", 
+        "context": "CREATE TABLE employee (salary Float32, department String)", 
+        "answer": "SELECT AVG(salary) FROM employee WHERE department = 'B'"
+    },
+    {
+        "question": "What are the top 4 products with the highest sales in Q2 20?", 
+        "context": "CREATE TABLE product (name String, sales Float64, order_date DateTime64)", 
+        "answer": "SELECT name, SUM(sales) AS total_sales FROM product WHERE toQuarter(order_date) = 2 AND toYear(order_date) = 2020 GROUP BY name ORDER BY total_sales DESC LIMIT 4" 
+    },
+    {
+        "question": "What is the number of employees who were hired in department A?",
+        "context": "CREATE TABLE employee (id Int64, department String)",
+        "answer": "SELECT COUNT(*) FROM employee WHERE department = 'A'"
+    },
+    {
+        "question": "What are the top 3 orders with the highest total value?",
+        "context": "CREATE TABLE order (order_date DateTime64, total Float32)", 
+        "answer": "SELECT id, SUM(total) AS total_value FROM order GROUP BY id ORDER BY total_value DESC LIMIT 3" 
+    },
+    {
+        "question": "What is the average age of employees in department C?",
+        "context": "CREATE TABLE employee (age Int64, department String)",
+        "answer": "SELECT AVG(age) FROM employee WHERE department = 'C'"
+    },
+    {
+        "question": "What are the top 5 customers with the highest spend in Q1 20?",
+        "context": "CREATE TABLE customer (id Int64, spend Float32, order_date DateTime64)", 
+        "answer": "SELECT id, SUM(spend) AS total_spend FROM customer WHERE toQuarter(order_date) = 1 AND toYear(order_date) = 2020 GROUP BY id ORDER BY total_spend DESC LIMIT 5" 
+    },
+    {
+        "question": "What is the number of orders that were placed in March?", 
+        "context": "CREATE TABLE order (order_date DateTime64)",
+        "answer": "SELECT COUNT(*) FROM order WHERE toMonth(order_date) = 3"
+    },
+    {
+        "question": "What are the top 2 products with the highest sales in department A?",
+        "context": "CREATE TABLE product (name String, sales Float64, department String)",
+        "answer": "SELECT name, SUM(sales) AS total_sales FROM product WHERE department = 'A' GROUP BY name ORDER BY total_sales DESC LIMIT 2" 
+    },
+    {
+        "question": "What is the average order value for orders that were placed in Q3 20?", 
+        "context": "CREATE TABLE order (order_date DateTime64, total Float32)",
+        "answer": "SELECT AVG(total) FROM order WHERE toQuarter(order_date) = 3 AND toYear(order_date) = 2020" 
+    },
+    {
+        "question": "What are the top 4 customers with the highest spend in department B?",
+        "context": "CREATE TABLE customer (id Int64, spend Float32, department String)", 
+        "answer": "SELECT id, SUM(spend) AS total_spend FROM customer WHERE department = 'B' GROUP BY id ORDER BY total_spend DESC LIMIT 4" 
+    },
+    {
+        "question": "Get all samples from patients older than 50 years.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, birthDate DateTime64)",
+        "answer": "SELECT * FROM patient WHERE DATEDIFF('year', birthDate, samplingDate) > 50"
+    },
+    {
+        "question": "Get the average age of patients who have samples taken in 2020.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, birthDate DateTime64)",
+        "answer": "SELECT AVG(DATEDIFF('year', birthDate, samplingDate)) FROM patient WHERE toYear(samplingDate) = 2020"
+    },
+    {
+        "question": "Get all samples from patients younger than 30 years and with a COVID diagnosis (ICD10 code U07.1).",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, birthDate DateTime64, icd10 String)",
+        "answer": "SELECT * FROM patient WHERE DATEDIFF('year', birthDate, samplingDate) < 30 AND icd10 = 'U07.1'"
+    },
+    {
+        "question": "Get the average age of patients who have samples taken in 2020 and have a COVID diagnosis (ICD10 code U07.1).",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, birthDate DateTime64, icd10 String)",
+        "answer": "SELECT AVG(DATEDIFF('year', birthDate, samplingDate)) FROM patient WHERE toYear(samplingDate) = 2020 AND icd10 = 'U07.1'"
+    },
+    {
+        "question": "Get the number of samples taken in 2020.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE toYear(samplingDate) = 2020"
+    },
+    {
+        "question": "Get the number of samples taken in 2020 and with a COVID diagnosis (ICD10 code U07.1).",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, icd10 String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE toYear(samplingDate) = 2020 AND icd10 = 'U07.1'"
+    },
+    {
+        "question": "Get the number of samples taken in 2020 and with a COVID diagnosis (ICD10 code U07.1) and from patients younger than 30 years.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, birthDate DateTime64, icd10 String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE toYear(samplingDate) = 2020 AND icd10 = 'U07.1' AND DATEDIFF('year', birthDate, samplingDate) < 30"
+    },
+    {
+        "question": "Get the number of samples taken in 2020 and with a COVID diagnosis (ICD10 code U07.1) and from patients older than 50 years.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, birthDate DateTime64, icd10 String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE toYear(samplingDate) = 2020 AND icd10 = 'U07.1' AND DATEDIFF('year', birthDate, samplingDate) > 50"
+    },
+    {
+        "question": "Get all serum samples of patients with a COVID diagnosis (ICD10 code U07.1) and participants of the clinical study NAPKON.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, icd10 String, studyName String)",
+        "answer": "SELECT * FROM patient WHERE icd10 = 'U07.1' AND studyName = 'NAPKON'"
+    },
+    {
+        "question": "Get the number of serum samples of patients with a COVID diagnosis (ICD10 code U07.1) and participants of the clinical study NAPKON.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, icd10 String, studyName String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE icd10 = 'U07.1' AND studyName = 'NAPKON'"
+    },
+    {
+        "question": "Get all samples and names from patients where the informed consent was rejected.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String, firstName String, lastName String)",
+        "answer": "SELECT sampleId, firstName, lastName FROM patient WHERE consentStatus = 'rejected'"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected'"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected and the samples were taken in 2020.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected' AND toYear(samplingDate) = 2020"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected and the samples were taken in 2020 and with a COVID diagnosis (ICD10 code U07.1).",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String, icd10 String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected' AND toYear(samplingDate) = 2020 AND icd10 = 'U07.1'"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected and the samples were taken in 2020 and with a COVID diagnosis (ICD10 code U07.1) and from patients younger than 30 years.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String, icd10 String, birthDate DateTime64)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected' AND toYear(samplingDate) = 2020 AND icd10 = 'U07.1' AND DATEDIFF('year', birthDate, samplingDate) < 30"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected and the samples were taken in 2020 and with a COVID diagnosis (ICD10 code U07.1) and from patients older than 50 years.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String, icd10 String, birthDate DateTime64)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected' AND toYear(samplingDate) = 2020 AND icd10 = 'U07.1' AND DATEDIFF('year', birthDate, samplingDate) > 50"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected and the samples were taken in 2020 and with a COVID diagnosis (ICD10 code U07.1) and from patients older than 50 years and participants of the clinical study NAPKON.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String, icd10 String, birthDate DateTime64, studyName String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected' AND toYear(samplingDate) = 2020 AND icd10 = 'U07.1' AND DATEDIFF('year', birthDate, samplingDate) > 50 AND studyName = 'NAPKON'"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected and the samples were taken in 2020 and with a COVID diagnosis (ICD10 code U07.1) and from patients younger than 30 years and participants of the clinical study NAPKON.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String, icd10 String, birthDate DateTime64, studyName String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected' AND toYear(samplingDate) = 2020 AND icd10 = 'U07.1' AND DATEDIFF('year', birthDate, samplingDate) < 30 AND studyName = 'NAPKON'"
+    },
+    {
+        "question": "Get the number of samples from patients where the informed consent was rejected and the samples were taken in 2020 and with a COVID diagnosis (ICD10 code U07.1) and from patients younger than 30 years and participants of the clinical study NAPKON and the samples are serum samples.",
+        "context": "CREATE TABLE patient (sampleId String, samplingDate DateTime64, consentStatus String, icd10 String, birthDate DateTime64, studyName String, sampleType String)",
+        "answer": "SELECT COUNT(*) FROM patient WHERE consentStatus = 'rejected' AND toYear(samplingDate) = 2020 AND icd10 = 'U07.1' AND DATEDIFF('year', birthDate, samplingDate) < 30 AND studyName = 'NAPKON' AND sampleType = 'serum'"
+    },
+    {
+        "question": "Get the number of slides that have been scanned in 2020 for all projects.",
+        "context": "CREATE TABLE services (projectId Int64, scanDate DateTime64, numberOfSlides Int64, serviceType String)",
+        "answer": "SELECT COUNT(*) FROM services WHERE toYear(scanDate) = 2020 AND serviceType = 'Virtual Microscopy'"
+    },
+    {
+        "question": "Get the number of slides that have been scanned in 2020 for the project with the ID 123.",
+        "context": "CREATE TABLE services (projectId Int64, scanDate DateTime64, numberOfSlides Int64, serviceType String)",
+        "answer": "SELECT COUNT(*) FROM services WHERE toYear(scanDate) = 2020 AND projectId = 123 AND serviceType = 'Virtual Microscopy'"
+    },
+    {
+        "question": "Get the number of slides that have been scanned in 2020 for the project with the ID 123 and the number of slides is greater than 100.",
+        "context": "CREATE TABLE services (projectId Int64, scanDate DateTime64, numberOfSlides Int64, serviceType String)",
+        "answer": "SELECT COUNT(*) FROM services WHERE toYear(scanDate) = 2020 AND projectId = 123 AND numberOfSlides > 100 AND serviceType = 'Virtual Microscopy'"
+    },
+    {
+        "question": "Get the number of slides that have been scanned in 2020 for the project with the ID 123 and the number of slides is greater than 100 and the service type is 'Virtual Microscopy'.",
+        "context": "CREATE TABLE services (projectId Int64, scanDate DateTime64, numberOfSlides Int64, serviceType String)",
+        "answer": "SELECT COUNT(*) FROM services WHERE toYear(scanDate) = 2020 AND projectId = 123 AND numberOfSlides > 100 AND serviceType = 'Virtual Microscopy'"
+    },
+    {
+        "question": "Get the number of slides that have been scanned in 2020 for the project with the ID 123 and the number of slides is greater than 100 and the service type is 'Virtual Microscopy' and the slides were scanned in the morning.",
+        "context": "CREATE TABLE services (projectId Int64, scanDate DateTime64, numberOfSlides Int64, serviceType String, scanTime DateTime64)",
+        "answer": "SELECT COUNT(*) FROM services WHERE toYear(scanDate) = 2020 AND projectId = 123 AND numberOfSlides > 100 AND serviceType = 'Virtual Microscopy' AND toHour(scanTime) < 12"
+    }
+]
