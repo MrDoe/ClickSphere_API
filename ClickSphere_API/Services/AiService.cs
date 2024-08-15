@@ -13,7 +13,39 @@ public partial class AiService(IDbService dbService) : IAiService
     private readonly IDbService DbService = dbService;
     private readonly string OllamaUrl = "http://localhost:11434";
     private readonly string OllamaApiPath = "/api/generate";
-    private readonly string SystemPrompt = "You are an expert for ClickHouse database systems. Your task is to convert a question from the user to a ClickHouse SQL query. Don't explain, output the query text only. Only use valid ClickHouse SQL functions and datatypes. Use the following table schema: `";
+    private readonly string SystemPrompt = """
+# IDENTITY and PURPOSE
+
+You are an expert for ClickHouse SQL databases and translate user questions into valid ClickHouse SQL queries.
+You are a master of ClickHouse SQL analyzing each prompt to identify the specific instructions and functions needed.
+You utilize this knowledge to generate an output that precisely matches the user's question.
+You are adept at understanding and following formatting instructions, ensuring that your responses are always accurate and perfectly aligned with the intended outcome.
+Take a step back and think step-by-step about how to achieve the best possible results by following the steps below.
+
+# STEPS
+
+- Analyze the given table schema below and identify the columns needed for the query. 
+- Analyze the question below and identify the specific ClickHouse SQL instructions and functions needed to generate a valid ClickHouse SQL query.
+- Use the ClickHouse SQL Reference (https://clickhouse.com/docs/en/sql-reference) as reference for validating ClickHouse SQL functions and data types.
+- Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
+- Ensure that all functions and data types used in the query are valid ClickHouse SQL functions and data types.
+- Ensure that you are using the correct number of arguments and data types when using functions in the query.
+- Write ClickHouse function names in camelCase format.
+
+# OUTPUT INSTRUCTIONS
+
+- Double-check the query to ensure that it is valid ClickHouse SQL and provides the desired output.
+- Don't explain. Output the SQL query text only.
+
+# INPUT
+- The SQL table schema is provided below:
+```
+[_TABLE_SCHEMA_]
+```
+
+# QUESTION
+""";
+
     private readonly string PromptAddition = " Don't explain. Output the SQL query only.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
@@ -112,6 +144,9 @@ public partial class AiService(IDbService dbService) : IAiService
         // remove newlines and unnecessary whitespaces from the table definition
         tableDefinition = SanitizeTableDefinition(tableDefinition.ToString());
 
+        // add table definition to the system prompt
+        string systemPrompt = SystemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
+
         using HttpClient client = new()
         {
             BaseAddress = new Uri(OllamaUrl),
@@ -132,10 +167,10 @@ public partial class AiService(IDbService dbService) : IAiService
 
         var request = new OllamaRequest
         {
-            model = "sqlcoder",
-            system = SystemPrompt + tableDefinition + "`",
-            prompt = question + PromptAddition,
-            stream = false
+            model = "codegemma",
+            system = systemPrompt,
+            prompt = question,
+            stream = false,
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
