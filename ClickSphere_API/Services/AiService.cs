@@ -77,7 +77,7 @@ Take a step back and think step-by-step about how to achieve the best possible r
         
         OllamaRequest request = new()
         {
-            model = "sqlcoder",
+            model = "codegemma",
             prompt = question,
             stream = false,
             system = systemPrompt
