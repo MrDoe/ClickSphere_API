@@ -223,8 +223,6 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
     /// <returns>The distinct values of the column</returns>
     public async Task<IList<string>> GetDistinctValues(string database, string viewId, string column)
     {
-        var result = await _dbService.ExecuteQueryList<object>($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 100");
-        return result.Cast<string>().ToList();
-    }
-    
+        return await _dbService.ExecuteQuery($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 50") ?? [];
+    }   
 }

@@ -45,7 +45,7 @@ public partial class AiService(IDbService dbService) : IAiService
         
         OllamaRequest request = new()
         {
-            model = "codegemma",
+            model = "sqlcoder",
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -115,24 +115,24 @@ public partial class AiService(IDbService dbService) : IAiService
         using HttpClient client = new()
         {
             BaseAddress = new Uri(OllamaUrl),
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
 
         // Add an Accept header for JSON format
         client.DefaultRequestHeaders.Accept.Clear();
-        var mediaType = new MediaTypeWithQualityHeaderValue("apsqlcoderplication/json");
+        var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
         client.DefaultRequestHeaders.Accept.Add(mediaType);
 
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.3,
+            temperature = 0.1,
             //num_thread = 14
         };
 
         var request = new OllamaRequest
         {
-            model = "codellama",
+            model = "sqlcoder",
             system = SystemPrompt + tableDefinition + "`",
             prompt = question + PromptAddition,
             stream = false

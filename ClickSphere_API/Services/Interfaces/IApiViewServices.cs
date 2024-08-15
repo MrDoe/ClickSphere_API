@@ -71,5 +71,5 @@ public interface IApiViewServices
     /// <param name="viewId">The view ID.</param>
     /// <param name="columnName">The column name.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task<IList<string>?> GetDistinctValues(string database, string viewId, string columnName);
+    Task<IList<string>> GetDistinctValues(string database, string viewId, string columnName);
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ClickSphere_API.Services;
+using ClickSphere_API.Models.Requests;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
@@ -25,16 +26,14 @@ public class AiController(IAiService AiService) : ControllerBase
     /// <summary>
     /// Generate a SQL query based on a question and a table.
     /// </summary>
-    /// <param name="database" example="default">The database to execute the query on.</param>
-    /// <param name="table" example="trips">The table to ask the question about.</param>
-    /// <param name="question" example="Calculate the average traveling time (in minutes) for all trips with a pickup date between 2015-01-01 and 2015-12-31.">The question to ask.</param>
+    /// <param name="request">The request to generate a query.</param>
     /// <returns>The answer to the question.</returns>
     [Route("/generateQuery")]
     [HttpPost]
-    public async Task<string> GenerateQuery(string question, string database, string table)
+    public async Task<string> GenerateQuery(GenerateQueryRequest request)
     {
         // Call the Ollama API
-        string response = await AiService.GenerateQuery(question, database, table);
+        string response = await AiService.GenerateQuery(request.Question, request.Database, request.Table);
         return response;
     }
 

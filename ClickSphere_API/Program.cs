@@ -75,7 +75,19 @@ builder.Services.AddResponseCompression(options =>
     options.EnableForHttps = true;
 });
 
+builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(
+           policy =>
+            {
+               policy.AllowAnyOrigin()
+                     .AllowAnyHeader()
+                       .AllowAnyMethod();
+            });
+    });
+
 var app = builder.Build();
+app.UseCors();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
