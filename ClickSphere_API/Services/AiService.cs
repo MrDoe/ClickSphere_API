@@ -12,7 +12,7 @@ public partial class AiService(IDbService dbService) : IAiService
 {
     private readonly IDbService DbService = dbService;
     private readonly string OllamaUrl = "http://localhost:11434";
-    private readonly string OllamaApiPath = "/api/generate";
+    private readonly string OllamaApiPath = "api/generate";
     private readonly string SystemPrompt = """
 # IDENTITY and PURPOSE
 
@@ -35,7 +35,7 @@ Take a step back and think step-by-step about how to achieve the best possible r
 # OUTPUT INSTRUCTIONS
 
 - Double-check the query to ensure that it is valid ClickHouse SQL and provides the desired output.
-- Don't explain. Output the SQL query text only.
+- Don't explain. Output the SQL query only.
 
 # INPUT
 - The SQL table schema is provided below:
@@ -45,8 +45,8 @@ Take a step back and think step-by-step about how to achieve the best possible r
 
 # QUESTION
 """;
+    private readonly string promptAddition = " Keep it short and simple. Don't explain - output the SQL query only.";
 
-    private readonly string PromptAddition = " Don't explain. Output the SQL query only.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -77,7 +77,7 @@ Take a step back and think step-by-step about how to achieve the best possible r
         
         OllamaRequest request = new()
         {
-            model = "codegemma",
+            model = "tinyllama",
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -161,15 +161,15 @@ Take a step back and think step-by-step about how to achieve the best possible r
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.1,
+            temperature = 0.0,
             //num_thread = 14
         };
 
         var request = new OllamaRequest
         {
-            model = "codegemma",
+            model = "text2sql",
             system = systemPrompt,
-            prompt = question,
+            prompt = question + promptAddition,
             stream = false,
         };
 
