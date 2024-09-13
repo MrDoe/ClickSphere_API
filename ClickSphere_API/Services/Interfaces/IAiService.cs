@@ -28,4 +28,12 @@ public interface IAiService
     /// <param name="table">The name of the table.</param>
     /// <returns>The result of executing the query.</returns>
     Task<string> GenerateAndExecuteQuery(string question, string database, string table);
+
+    /// <summary>
+    ///  Gets the possible questions that can be asked to the AI service based on the database and table provided.
+    /// </summary>
+    /// <param name="database"></param>
+    /// <param name="table"></param>
+    /// <returns></returns>
+    Task<IList<string>> GetPossibleQuestions(string database, string table);
 }

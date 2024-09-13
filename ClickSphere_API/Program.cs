@@ -46,7 +46,7 @@ builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 builder.Services.AddScoped<IDbService, DbService>();
 builder.Services.AddScoped<IApiUserService, ApiUserService>();
 builder.Services.AddScoped<IApiRoleService, ApiRoleService>();
-builder.Services.AddScoped<IApiViewServices, ApiViewServices>();
+builder.Services.AddScoped<IApiViewService, ApiViewServices>();
 builder.Services.AddScoped<ISqlParser, SqlParser>();
 builder.Services.AddScoped<IAiService, AiService>();
 

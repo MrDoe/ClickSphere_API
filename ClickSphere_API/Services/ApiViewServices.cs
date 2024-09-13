@@ -1,3 +1,4 @@
+using System.Text;
 using ClickSphere_API.Models;
 namespace ClickSphere_API.Services;
 
@@ -5,7 +6,7 @@ namespace ClickSphere_API.Services;
 /// Service class for handling view operations.
 /// </summary>
 /// <param name="dbService"></param>
-public class ApiViewServices(IDbService dbService) : IApiViewServices
+public class ApiViewServices(IDbService dbService) : IApiViewService
 {
     private readonly IDbService _dbService = dbService;
 
@@ -120,7 +121,7 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
     /// <returns>The configuration of the view</returns>
     public async Task<View> GetViewConfig(string database, string viewId)
     {
-        return await _dbService.ExecuteQueryObject<View>("SELECT c.Id, c.Name, c.Description, s.database as Database, s.as_select as Query " +
+        return await _dbService.ExecuteQueryObject<View>("SELECT c.Id, c.Name, c.Description, s.database as Database, s.as_select as Query, c.Questions " +
                                                          "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " +
                                                          $"WHERE s.database = '{database}' and s.engine = 'View' and c.Id = '{viewId}'");
     }
@@ -138,7 +139,11 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
         // update view in CV_Views table
         if (result == 0)
         {
-            string updateQuery = $"ALTER TABLE ClickSphere.Views UPDATE Name = '{view.Name}', Description = '{view.Description}' WHERE Id = '{view.Id}';";
+            string updateQuery = $"ALTER TABLE ClickSphere.Views " + 
+                                 $"UPDATE Name = '{view.Name}', " + 
+                                 $"Description = '{view.Description}', " + 
+                                 $"Questions = '{view.Questions}' " + 
+                                 $"WHERE Id = '{view.Id}';";
             int updateResult = await _dbService.ExecuteNonQuery(updateQuery);
             if (updateResult < 0)
                 return Results.BadRequest("Could not update view in ClickSphere.Views table");
@@ -154,44 +159,103 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
     /// </summary>
     /// <param name="database">The database to get the view from</param>
     /// <param name="viewId">The viewId to get the columns from</param>
+    /// <param name="forceUpdate">Force update of the view columns</param>
     /// <returns>The columns of the view</returns>
-    public async Task<IList<ViewColumns>> GetViewColumns(string database, string viewId)
+    public async Task<IList<ViewColumns>> GetViewColumns(string database, string viewId, bool forceUpdate = false)
     {
         List<ViewColumns> columns;
-        
-        // try to get data from ViewColumns table
-        columns = await _dbService.ExecuteQueryList<ViewColumns>($"SELECT * FROM ClickSphere.ViewColumns WHERE Database = '{database}' AND ViewId = '{viewId}' order by Sorter");
 
-        if(columns.Count == 0)
-        {    
-            // insert data into viewColumns table
-            var viewCols = await _dbService.ExecuteQueryDictionary($"SELECT name as `Column Name`, type as `Data Type` FROM system.columns WHERE table = '{viewId}' and database = '{database}'");
-            
-            if(viewCols == null)
-                return [];
-            
-            int sorter = 0;
-            foreach (var col in viewCols)
+        if (forceUpdate)
+        {
+            // delete data from ViewColumns table
+            await _dbService.ExecuteNonQuery($"DELETE FROM ClickSphere.ViewColumns WHERE Database = '{database}' AND ViewId = '{viewId}'");
+
+            // update data from ViewColumns table
+            bool success = await UpdateViewColumns(database, viewId);
+
+            if (!success)
+                return new List<ViewColumns>();
+
+            // load data from ViewColumns table
+            return await LoadViewColumns(database, viewId);
+        }
+        else
+        {
+            // try to get data from ViewColumns table
+            columns = await LoadViewColumns(database, viewId);
+
+            if (columns.Count == 0)
             {
-                string? controlType = col["Data Type"] switch
-                {
-                    "String" => "TextBox",
-                    "UInt8" or "UInt16" or "UInt32" or "UInt64" or "Int8" or "Int16" or "Int32" or "Int64" => "Numeric",
-                    "Float32" or "Float64" => "Numeric",
-                    "DateTime" or "DateTime64(3)" => "DateTime",
-                    _ => "TextBox",
-                };
-                string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter) " +
-                                     $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{col["Data Type"]}','{controlType}',{sorter});";
+                bool success = await UpdateViewColumns(database, viewId);
 
-                await _dbService.ExecuteNonQuery(insertQuery);
-                ++sorter;
+                if (!success)
+                    return new List<ViewColumns>();
+
+                // load data from ViewColumns table again
+                columns = await LoadViewColumns(database, viewId);
             }
+            return columns;
+        }
+    }
 
-            // try to get data from ViewColumns table again
-            columns = await _dbService.ExecuteQueryList<ViewColumns>($"SELECT * FROM ClickSphere.ViewColumns WHERE Database = '{database}' AND ViewId = '{viewId}' order by Sorter");
-        }        
-        return columns;
+    private async Task<List<ViewColumns>> LoadViewColumns(string database, string viewId)
+    {
+        return await _dbService.ExecuteQueryList<ViewColumns>($"SELECT * FROM ClickSphere.ViewColumns WHERE Database = '{database}' AND ViewId = '{viewId}' order by Sorter");
+    }
+
+    private async Task<bool> UpdateViewColumns(string database, string viewId)
+    {
+        // insert data into viewColumns table
+        var viewCols = await _dbService.ExecuteQueryDictionary($"SELECT name as `Column Name`, type as `Data Type` FROM system.columns WHERE table = '{viewId}' and database = '{database}'");
+
+        if (viewCols == null)
+            return false;
+
+        int sorter = 0;
+        foreach (var col in viewCols)
+        {
+            string? controlType = col["Data Type"] switch
+            {
+                "String" => "TextBox",
+                "UInt8" or "UInt16" or "UInt32" or "UInt64" or "Int8" or "Int16" or "Int32" or "Int64" => "Numeric",
+                "Float32" or "Float64" => "Numeric",
+                "DateTime" or "DateTime64(3)" => "DateTime",
+                _ => "TextBox",
+            };
+            string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter) " +
+                                 $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{col["Data Type"]}','{controlType}',{sorter});";
+
+            await _dbService.ExecuteNonQuery(insertQuery);
+            ++sorter;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Get columns, data types and descriptions of a view
+    /// </summary>
+    /// <param name="database">The database to get the view from</param>
+    /// <param name="viewId">The viewId to get the columns from</param>
+    /// <returns>View definition as string</returns>
+    public async Task<string> GetViewDefinition(string database, string viewId)
+    {
+        string query = $"SELECT ColumnName, DataType, Description " +
+                       $"FROM ClickSphere.ViewColumns " +
+                       $"WHERE Database = '{database}' AND ViewId = '{viewId}' order by Sorter";
+
+        var output = await _dbService.ExecuteQueryDictionary(query);
+        if (output == null)
+            return "";
+
+        // create view definition as CSV
+        StringBuilder csv = new();
+        csv.AppendLine("Column Name,Data Type,Description");
+        foreach (var row in output)
+        {
+            csv.AppendLine($"{row["ColumnName"]},{row["DataType"]},{row["Description"]}");
+        }
+
+        return csv.ToString();
     }
 
     /// <summary>
@@ -204,9 +268,10 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
         string query = $"ALTER TABLE ClickSphere.ViewColumns " +
                        $"UPDATE ControlType = '{column.ControlType}', " +
                        $"Placeholder = '{column.Placeholder}', " +
-                       $"Sorter = {column.Sorter} " +
+                       $"Sorter = {column.Sorter}, " +
+                       $"Description = '{column.Description}' " +
                        $"WHERE Id = '{column.Id}';";
-        
+
         int result = await _dbService.ExecuteNonQuery(query);
         if (result == 0)
             return Results.Ok();
@@ -224,5 +289,5 @@ public class ApiViewServices(IDbService dbService) : IApiViewServices
     public async Task<IList<string>> GetDistinctValues(string database, string viewId, string column)
     {
         return await _dbService.ExecuteQuery($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 50") ?? [];
-    }   
+    }
 }

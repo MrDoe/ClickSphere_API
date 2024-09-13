@@ -38,6 +38,12 @@ public class View
     public string Query { get; set; }
     
     /// <summary>
+    /// Gets or sets the example questions for the view.
+    /// </summary>
+    [JsonPropertyName("questions")]
+    public string Questions { get; set; }
+    
+    /// <summary>
     /// Initializes a new instance of the <see cref="View"/> class.
     /// </summary>
     public View()

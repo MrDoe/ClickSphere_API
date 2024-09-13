@@ -3,14 +3,17 @@ using System.Text;
 using System.Text.Json;
 using ClickSphere_API.Models.Requests;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc.ViewEngines;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
 namespace ClickSphere_API.Services;
 
 /// <summary>
 /// Ai service class to connect to Ollama
 /// </summary>
-public partial class AiService(IDbService dbService) : IAiService
+public partial class AiService(IDbService dbService, IApiViewService viewService) : IAiService
 {
     private readonly IDbService DbService = dbService;
+    private readonly IApiViewService? ViewService = viewService;
     private readonly string OllamaUrl = "http://localhost:11434";
     private readonly string OllamaApiPath = "api/generate";
     private readonly string SystemPrompt = """
@@ -18,13 +21,14 @@ public partial class AiService(IDbService dbService) : IAiService
 
 You are an expert for ClickHouse SQL databases and translate user questions into valid ClickHouse SQL queries.
 You are a master of ClickHouse SQL analyzing each prompt to identify the specific instructions and functions needed.
+You are an expert for medical data and terminology, and you are able to generate queries that accurately reflect the user's question.
 You utilize this knowledge to generate an output that precisely matches the user's question.
 You are adept at understanding and following formatting instructions, ensuring that your responses are always accurate and perfectly aligned with the intended outcome.
 Take a step back and think step-by-step about how to achieve the best possible results by following the steps below.
 
 # STEPS
 
-- Analyze the given table schema below and identify the columns needed for the query. 
+- Analyze the given table schema below and identify the columns needed for the query. Use the column descriptions to understand what data is to be expected.
 - Analyze the question below and identify the specific ClickHouse SQL instructions and functions needed to generate a valid ClickHouse SQL query.
 - Use the ClickHouse SQL Reference (https://clickhouse.com/docs/en/sql-reference) as reference for validating ClickHouse SQL functions and data types.
 - Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
@@ -38,10 +42,10 @@ Take a step back and think step-by-step about how to achieve the best possible r
 - Don't explain. Output the SQL query only.
 
 # INPUT
-- The SQL table schema is provided below:
-```
-[_TABLE_SCHEMA_]
-```
+- The table name is:
+`[_TABLE_NAME_]`
+- The table schema is:
+`[_TABLE_SCHEMA_]`
 
 # QUESTION
 """;
@@ -54,7 +58,7 @@ Take a step back and think step-by-step about how to achieve the best possible r
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
-    
+
     /// <summary>
     /// Ask a question regarding to ClickHouse databases
     /// </summary>
@@ -74,10 +78,10 @@ Take a step back and think step-by-step about how to achieve the best possible r
         client.DefaultRequestHeaders.Accept.Add(mediaType);
 
         string systemPrompt = "You are an expert for ClickHouse database systems. Answer questions related to ClickHouse databases only.";
-        
+
         OllamaRequest request = new()
         {
-            model = "tinyllama",
+            model = "gemma2",
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -107,25 +111,6 @@ Take a step back and think step-by-step about how to achieve the best possible r
         }
     }
 
-    private string SanitizeTableDefinition(string tableDefinition)
-    {
-        string sanitizedTableDefinition;
-        // remove unnecessary characters
-        sanitizedTableDefinition = tableDefinition.Replace("`", "");
-        sanitizedTableDefinition = sanitizedTableDefinition.Replace("\n", " ");
-        sanitizedTableDefinition = sanitizedTableDefinition.Replace("\t", "");
-        sanitizedTableDefinition = sanitizedTableDefinition.Replace("  ", " ");
-        sanitizedTableDefinition = sanitizedTableDefinition.Replace("  ", " ");
-        sanitizedTableDefinition = sanitizedTableDefinition.Replace("  ", " ");
-
-        // cut off everything after SETTINGS
-        int settingsIndex = sanitizedTableDefinition.IndexOf("SETTINGS");
-        if (settingsIndex != -1)
-            sanitizedTableDefinition = sanitizedTableDefinition[..settingsIndex];
-        
-        return sanitizedTableDefinition;
-    }
-
     /// <summary>
     /// Generate a SQL query based on a question and a table
     /// </summary>
@@ -136,16 +121,14 @@ Take a step back and think step-by-step about how to achieve the best possible r
     public async Task<string> GenerateQuery(string question, string database, string table)
     {
         // get source table definition from database
-        string? tableDefinition = (await DbService.ExecuteScalar($"SHOW CREATE TABLE `{database}`.`{table}`"))?.ToString();
+        string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
 
         if (tableDefinition == null)
             return "ERROR: Invalid table name!";
 
-        // remove newlines and unnecessary whitespaces from the table definition
-        tableDefinition = SanitizeTableDefinition(tableDefinition.ToString());
-
         // add table definition to the system prompt
-        string systemPrompt = SystemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
+        string systemPrompt = SystemPrompt.Replace("[_TABLE_NAME_]", $"{database}.{table}");
+        systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
 
         using HttpClient client = new()
         {
@@ -161,13 +144,12 @@ Take a step back and think step-by-step about how to achieve the best possible r
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0,
-            //num_thread = 14
+            temperature = 0.0
         };
 
         var request = new OllamaRequest
         {
-            model = "text2sql",
+            model = "codegemma",
             system = systemPrompt,
             prompt = question + promptAddition,
             stream = false,
@@ -195,13 +177,25 @@ Take a step back and think step-by-step about how to achieve the best possible r
             // Return the answer from the json object
             if (jsonObject.response != null)
             {
+                string responseText = jsonObject.response.Trim();
+
+                // remove ```sql from the beginning of the response and ``` from the end
+                int sqlIndex = responseText.IndexOf("```sql");
+                int endSqlIndex = responseText.LastIndexOf("```");
+                if (sqlIndex != -1 && endSqlIndex != -1)
+                {
+                    responseText = responseText[(sqlIndex + 5)..endSqlIndex];
+                }
+
                 // get the query after the first SELECT until the first ';' character
-                int selectIndex = jsonObject.response.IndexOf("SELECT");
-                int semicolonIndex = jsonObject.response.IndexOf(';');
+                int selectIndex = responseText.IndexOf("SELECT");
+                int semicolonIndex = responseText.IndexOf(';');
                 if (selectIndex != -1 && semicolonIndex != -1)
                 {
-                    return jsonObject.response[selectIndex..(semicolonIndex + 1)];
+                    responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
+
+                return responseText;
             }
             return jsonObject.response ?? "Unsuccessful query generation!";
         }
@@ -234,6 +228,110 @@ Take a step back and think step-by-step about how to achieve the best possible r
         catch (Exception e)
         {
             return e.Message + "\n\nQuery: " + query;
+        }
+    }
+
+    /// <summary>
+    /// Get first 10 rows of the table and ask AI to generate a list of possible questions
+    /// </summary>
+    /// <param name="database">The database to get the table from</param>
+    /// <param name="table">The table to get the rows from</param>
+    /// <returns>List of possible questions</returns>
+    public async Task<IList<string>> GetPossibleQuestions(string database, string table)
+    {
+        // get first 100 rows of the table
+        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 100");
+
+        // create a prompt with the table rows
+        StringBuilder prompt = new();
+        prompt.AppendLine("Given the following example of a table:");
+
+        // generate column header
+        var columnHeaders = rows.First().Keys;
+        foreach (var column in columnHeaders)
+        {
+            prompt.Append($"{column}");
+            if (column != columnHeaders.Last())
+                prompt.Append(',');
+        }
+        foreach (var row in rows)
+        {
+            if(row == rows.First())
+                continue;
+            
+            foreach (var column in row)
+            {
+                prompt.Append($"{column.Value},");
+            }
+            prompt.AppendLine();
+        }
+
+        prompt.AppendLine("Generate a list of 20 interesting questions querying the dataset based on the example dataset. Only query data from valid columns of the example dataset. No explanations. No numberings or bullet lists. Output the questions only, separated by newline characters.");
+
+        using HttpClient client = new()
+        {
+            BaseAddress = new Uri(OllamaUrl),
+            Timeout = TimeSpan.FromSeconds(60)
+        };
+
+        // Add an Accept header for JSON format
+        client.DefaultRequestHeaders.Accept.Clear();
+        var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
+        client.DefaultRequestHeaders.Accept.Add(mediaType);
+
+        // Create the JSON string for the request
+        var requestOptions = new OllamaRequestOptions
+        {
+            temperature = 0.0
+        };
+
+        var request = new OllamaRequest
+        {
+            model = "codegemma",
+            system = prompt.ToString(),
+            prompt = "Only query data from valid columns of the example dataset. No explanations. No numberings or bullet lists. Output the questions only, separated by newline characters.",
+            stream = false,
+        };
+
+        string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
+
+        var jsonContent = new StringContent(
+            jsonRequest,
+            Encoding.UTF8,
+            mediaType);
+
+        // Send POST request to the Ollama API
+        HttpResponseMessage response = await client.PostAsync(OllamaApiPath, jsonContent);
+
+        if (response.IsSuccessStatusCode)
+        {
+            // Read the response object
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            if(jsonResponse == null)
+                return new List<string> { "ERROR: No response from Ollama API!" };
+            
+            var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
+
+            // Return the answer from the json object
+            if (jsonObject!.response != null)
+            {
+                string responseText = jsonObject.response.Trim();
+
+                // get view object
+                var view = await ViewService!.GetViewConfig(database, table);
+                view.Questions = responseText;
+
+                // write questions to config table
+                await ViewService!.UpdateView(view);
+
+                // split the response into lines
+                return responseText.Split('\n').Select(x => x.Trim()).ToList();
+            }
+            return new List<string> { "Unsuccessful generation of questions!" };
+        }
+        else
+        {
+            throw new Exception($"Error calling Ollama API: {response.StatusCode}");
         }
     }
 }

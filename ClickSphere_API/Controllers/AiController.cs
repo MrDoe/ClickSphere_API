@@ -52,4 +52,19 @@ public class AiController(IAiService AiService) : ControllerBase
         string response = await AiService.GenerateAndExecuteQuery(question, database, table);
         return response;
     }
+
+    /// <summary>
+    /// Get the possible questions that can be asked to the AI service based on the database and table provided.
+    /// </summary>
+    /// <param name="database" example="default">The name of the database.</param>
+    /// <param name="table" example="trips">The name of the table.</param>
+    /// <returns>The list of possible questions.</returns>
+    [Route("/getPossibleQuestions")]
+    [HttpGet]
+    public async Task<IList<string>> GetPossibleQuestions(string database, string table)
+    {
+        // Call the Ollama API
+        IList<string> response = await AiService.GetPossibleQuestions(database, table);
+        return response;
+    }
 }

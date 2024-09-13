@@ -5,10 +5,10 @@ namespace ClickSphere_API.Services;
 /// <summary>
 /// This class provides methods for managing roles in the ClickHouse database system.
 /// </summary>
-public partial class ApiRoleService(IDbService dbService, IApiViewServices viewServices) : IApiRoleService
+public partial class ApiRoleService(IDbService dbService, IApiViewService viewServices) : IApiRoleService
 {
     private readonly IDbService dbService = dbService;
-    private readonly IApiViewServices viewServices = viewServices;
+    private readonly IApiViewService viewServices = viewServices;
 
     [GeneratedRegex(@"^GRANT SELECT ON (?<database>\w+)\.(?<view>\w+).*$")]
     private static partial Regex RegExParseViews();

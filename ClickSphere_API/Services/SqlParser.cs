@@ -15,22 +15,32 @@ namespace ClickSphere_API.Services
         /// <returns>A ParsedQuery object containing the parsed query information.</returns>
         public ParsedQuery Parse(string query)
         {
-            // Convert the query to uppercase and trim leading and trailing whitespace
-            var upperQuery = query.Trim().ToUpperInvariant();
+            // cut semi-colon from the end of the query
+            if (query.Trim().EndsWith(';'))
+            {
+                query = query.Trim()[..(query.Length - 1)];
+            }
+
+            // Convert the query to uppercase
+            var upperQuery = query.ToUpperInvariant();
 
             // Check if the query contains a semicolon that is not inside a string literal
             bool insideStringLiteral = false;
+            int charIndex = 0;
             foreach (char c in query)
             {
                 if (c == '\'' || c == '"')
                 {
                     insideStringLiteral = !insideStringLiteral;
                 }
-                else if (c == ';' && !insideStringLiteral)
+                else if (c == ';' && !insideStringLiteral && charIndex != query.Length - 1)
                 {
                     throw new ArgumentException("Multiple statements are not allowed");
                 }
+                charIndex++;
             }
+
+
 
             // Check if the query starts with a data modifying statement
             if (upperQuery.StartsWith("INSERT INTO") || upperQuery.StartsWith("UPDATE") || upperQuery.StartsWith("DELETE") ||

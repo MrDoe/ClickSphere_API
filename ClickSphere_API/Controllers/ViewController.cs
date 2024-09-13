@@ -7,9 +7,9 @@ namespace ClickSphere_API.Controllers;
 /// Controller class for managing views in the ClickSphere database system
 /// </summary>
 [ApiController]
-public class ViewController(IApiViewServices viewServices) : ControllerBase
+public class ViewController(IApiViewService viewServices) : ControllerBase
 {
-    private readonly IApiViewServices ViewServices = viewServices;
+    private readonly IApiViewService ViewServices = viewServices;
 
     /// <summary>
     /// Create a new view in the specified database
@@ -96,15 +96,31 @@ public class ViewController(IApiViewServices viewServices) : ControllerBase
     /// </summary>
     /// <param name="database">The database to get the view from</param>
     /// <param name="viewId">The viewId to get the columns from</param>
+    /// <param name="forceUpdate">Force update of the columns</param>
     /// <returns>The columns of the view</returns>
     [Authorize]
     [HttpGet]
     [Route("/getViewColumns")]
-    public async Task<IList<ViewColumns>> GetViewColumns(string database, string viewId)
+    public async Task<IList<ViewColumns>> GetViewColumns(string database, string viewId, bool forceUpdate)
     {
-        return await ViewServices.GetViewColumns(database, viewId);
+        return await ViewServices.GetViewColumns(database, viewId, forceUpdate);
     }
 
+    /// <summary>
+    /// Get view definition for AI search
+    /// </summary>
+    /// <param name="database">The database to get the view from</param>
+    /// <param name="viewId">The viewId to get the definition from</param>
+    /// <returns>The view definition</returns>
+    [Authorize]
+    [HttpGet]
+    [Route("/getViewDefinition")]
+    public async Task<string> GetViewDefinition(string database, string viewId)
+    {
+        return await ViewServices.GetViewDefinition(database, viewId);
+    }
+    
+    
     /// <summary>
     /// Update configuration of a view column 
     /// </summary>

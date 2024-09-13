@@ -3,7 +3,7 @@ namespace ClickSphere_API.Services;
 /// <summary>
 /// Represents the interface for interacting with API views.
 /// </summary>
-public interface IApiViewServices
+public interface IApiViewService
 {
     /// <summary>
     /// Creates a new view.
@@ -43,6 +43,14 @@ public interface IApiViewServices
     Task<View> GetViewConfig(string database, string viewId);
 
     /// <summary>
+    /// Gets the definition of a specific view.
+    /// </summary>
+    /// <param name="database">The database name.</param>
+    /// <param name="viewId">The view ID.</param>
+    /// <returns>A task representing the asynchronous operation.</returns> 
+    Task<string> GetViewDefinition(string database, string viewId);
+
+    /// <summary>
     /// Updates a view.
     /// </summary>
     /// <param name="view">The view to update.</param>
@@ -54,8 +62,9 @@ public interface IApiViewServices
     /// </summary>
     /// <param name="database">The database name.</param>
     /// <param name="viewId">The view ID.</param>
+    /// <param name="forceUpdate">Whether to force an update of the columns.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task<IList<ViewColumns>> GetViewColumns(string database, string viewId);
+    Task<IList<ViewColumns>> GetViewColumns(string database, string viewId, bool forceUpdate);
 
     /// <summary>
     /// Update a view column configuration.
