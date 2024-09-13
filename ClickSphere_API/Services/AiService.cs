@@ -240,20 +240,44 @@ Take a step back and think step-by-step about how to achieve the best possible r
     public async Task<IList<string>> GetPossibleQuestions(string database, string table)
     {
         // get first 100 rows of the table
-        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 100");
+        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+
+        // get source table definition from database
+        string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
+
+        if (tableDefinition == null)
+            return [];
+
+        // add table definition to the system prompt
+        string systemPrompt = """
+# IDENTITY and PURPOSE
+You are an expert for data analysis and medicial data.
+You are able to generate a list of related questions for analyzing a given dataset.
+Take a look at the Example Dataset given below.
+Precisely follow the instructions given to you.
+
+# TABLE SCHEMA
+[_TABLE_SCHEMA_]
+
+# EXAMPLE DATASET
+""";
+        
+        systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
 
         // create a prompt with the table rows
         StringBuilder prompt = new();
-        prompt.AppendLine("Given the following example of a table:");
 
         // generate column header
         var columnHeaders = rows.First().Keys;
         foreach (var column in columnHeaders)
         {
-            prompt.Append($"{column}");
+            prompt.Append($"\"{column}\"");
             if (column != columnHeaders.Last())
                 prompt.Append(',');
         }
+
+        prompt.AppendLine();
+
         foreach (var row in rows)
         {
             if(row == rows.First())
@@ -261,12 +285,15 @@ Take a step back and think step-by-step about how to achieve the best possible r
             
             foreach (var column in row)
             {
-                prompt.Append($"{column.Value},");
+                prompt.Append($"\"{column.Value}\",");
             }
             prompt.AppendLine();
         }
-
-        prompt.AppendLine("Generate a list of 20 interesting questions querying the dataset based on the example dataset. Only query data from valid columns of the example dataset. No explanations. No numberings or bullet lists. Output the questions only, separated by newline characters.");
+        prompt.AppendLine("# TASKS");
+        prompt.AppendLine("Generate a list of 5 to 10 related questions for analyzing the Example Dataset." + 
+                          "Only ask questions about columns of the Example Dataset. No explanations. No numberings. No bullet lists. " + 
+                          "Do not ask questions where columns are needed which are not present in the Example Dataset. " +
+                          "Output the questions only, separated by newline characters.");
 
         using HttpClient client = new()
         {
@@ -288,8 +315,8 @@ Take a step back and think step-by-step about how to achieve the best possible r
         var request = new OllamaRequest
         {
             model = "codegemma",
-            system = prompt.ToString(),
-            prompt = "Only query data from valid columns of the example dataset. No explanations. No numberings or bullet lists. Output the questions only, separated by newline characters.",
+            system = systemPrompt,
+            prompt = prompt.ToString(),
             stream = false,
         };
 
