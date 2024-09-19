@@ -196,7 +196,7 @@ public partial class ApiRoleService(IDbService dbService, IApiViewService viewSe
     public async Task<List<View>> GetViewsForRole(string roleName)
     {
         string query = $"SHOW GRANTS FOR `{roleName}`";
-    List<string> result = await dbService.ExecuteQuery(query);
+        List<string> result = await dbService.ExecuteQuery(query);
 
         // parse with Regex to get Database and View
         List<View> views = [];

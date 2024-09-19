@@ -265,11 +265,15 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
     /// <returns>The result of the column update</returns>
     public async Task<IResult> UpdateViewColumn(ViewColumns column)
     {
+        // escape single quotes
+        string placeholder = column.Placeholder.Replace("'", "''");
+        string description = column.Description.Replace("'", "''");
+
         string query = $"ALTER TABLE ClickSphere.ViewColumns " +
                        $"UPDATE ControlType = '{column.ControlType}', " +
-                       $"Placeholder = '{column.Placeholder}', " +
+                       $"Placeholder = '{placeholder}', " +
                        $"Sorter = {column.Sorter}, " +
-                       $"Description = '{column.Description}' " +
+                       $"Description = '{description}' " +
                        $"WHERE Id = '{column.Id}';";
 
         int result = await _dbService.ExecuteNonQuery(query);

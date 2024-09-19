@@ -34,7 +34,8 @@ Take a step back and think step-by-step about how to achieve the best possible r
 - Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
 - Ensure that all functions and data types used in the query are valid ClickHouse SQL functions and data types.
 - Ensure that you are using the correct number of arguments and data types when using functions in the query.
-- Write ClickHouse function names in camelCase format.
+- Write ClickHouse function names in camelCase format (e.g., toDate, toDateTime). Start function names with a lowercase letter.
+- Do not write any SQL comments in the query.
 
 # OUTPUT INSTRUCTIONS
 
