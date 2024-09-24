@@ -33,7 +33,7 @@ public class AiController(IAiService AiService) : ControllerBase
     public async Task<string> GenerateQuery(GenerateQueryRequest request)
     {
         // Call the Ollama API
-        string response = await AiService.GenerateQuery(request.Question, request.Database, request.Table);
+        string response = await AiService.GenerateQuery(request.Question, request.Database, request.Table);        
         return response;
     }
 

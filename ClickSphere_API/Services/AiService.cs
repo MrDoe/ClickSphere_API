@@ -19,34 +19,36 @@ public partial class AiService(IDbService dbService, IApiViewService viewService
     private readonly string SystemPrompt = """
 # IDENTITY and PURPOSE
 
-You are an expert for ClickHouse SQL databases and translate user questions into valid ClickHouse SQL queries.
-You are a master of ClickHouse SQL analyzing each prompt to identify the specific instructions and functions needed.
-You are an expert for medical data and terminology, and you are able to generate queries that accurately reflect the user's question.
-You utilize this knowledge to generate an output that precisely matches the user's question.
-You are adept at understanding and following formatting instructions, ensuring that your responses are always accurate and perfectly aligned with the intended outcome.
-Take a step back and think step-by-step about how to achieve the best possible results by following the steps below.
+Translate natural text in English or German to ClickHouse SQL queries (Text2SQL).
+Be an expert in ClickHouse SQL databases.
+Be an expert in clinical and medical data and terminology in German and English.
+Use ClickHouse SQL references, tutorials, and documentation to generate valid ClickHouse SQL queries.
 
 # STEPS
 
-- Analyze the given table schema below and identify the columns needed for the query. Use the column descriptions to understand what data is to be expected.
-- Analyze the question below and identify the specific ClickHouse SQL instructions and functions needed to generate a valid ClickHouse SQL query.
-- Use the ClickHouse SQL Reference (https://clickhouse.com/docs/en/sql-reference) as reference for validating ClickHouse SQL functions and data types.
+- Analyze the given table schema and identify the necessary columns. Use column descriptions to understand the expected data.
+- Use only the columns provided in the table schema to generate the query.
+- Analyze the question and identify the specific ClickHouse SQL instructions and functions needed.
+- Use the ClickHouse SQL Reference to validate all possible ClickHouse SQL functions and data types.
 - Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
-- Ensure that all functions and data types used in the query are valid ClickHouse SQL functions and data types.
-- Ensure that you are using the correct number of arguments and data types when using functions in the query.
+- Ensure all functions and data types used in the query are valid ClickHouse SQL functions and data types.
+- Ensure the correct number of arguments and data types are used in functions.
+- Ensure all column names in the query match exactly as written in the table schema.
 - Write ClickHouse function names in camelCase format (e.g., toDate, toDateTime). Start function names with a lowercase letter.
-- Do not write any SQL comments in the query.
+- Do not write any comments with dashes (--) in the query.
+- Translate diagnoses provided as text into the respective ICD-10 codes, if needed.
+- Split up diagnoses from the question into their respective words (e.g., 'lung cancer' -> '%lung%', '%cancer%').
+- Append 'If' (like countIf, sumIf, avgIf, etc.) to the function name if needed.
 
 # OUTPUT INSTRUCTIONS
 
-- Double-check the query to ensure that it is valid ClickHouse SQL and provides the desired output.
-- Don't explain. Output the SQL query only.
+- Double-check the query to ensure it is valid ClickHouse SQL and provides the desired output.
+- Output the SQL query only. No comments.
+- Ask for clarification if the question is unclear or ambiguous or a column is missing in the table schema.
 
 # INPUT
-- The table name is:
-`[_TABLE_NAME_]`
-- The table schema is:
-`[_TABLE_SCHEMA_]`
+- Table name: `[_TABLE_NAME_]`
+- Table schema: `[_TABLE_SCHEMA_]`
 
 # QUESTION
 """;
@@ -191,7 +193,12 @@ Take a step back and think step-by-step about how to achieve the best possible r
                 // get the query after the first SELECT until the first ';' character
                 int selectIndex = responseText.IndexOf("SELECT");
                 int semicolonIndex = responseText.IndexOf(';');
-                if (selectIndex != -1 && semicolonIndex != -1)
+                if(semicolonIndex == -1)
+                {
+                    semicolonIndex = responseText.Length - 1;
+                }
+
+                if (selectIndex != -1)
                 {
                     responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
@@ -336,7 +343,7 @@ Precisely follow the instructions given to you.
             // Read the response object
             string jsonResponse = await response.Content.ReadAsStringAsync();
             if(jsonResponse == null)
-                return new List<string> { "ERROR: No response from Ollama API!" };
+                return ["ERROR: No response from Ollama API!"];
             
             var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
 
@@ -355,7 +362,7 @@ Precisely follow the instructions given to you.
                 // split the response into lines
                 return responseText.Split('\n').Select(x => x.Trim()).ToList();
             }
-            return new List<string> { "Unsuccessful generation of questions!" };
+            return ["Unsuccessful generation of questions!"];
         }
         else
         {

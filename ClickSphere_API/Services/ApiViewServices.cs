@@ -265,6 +265,9 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
     /// <returns>The result of the column update</returns>
     public async Task<IResult> UpdateViewColumn(ViewColumns column)
     {
+        if(column == null)
+            return Results.BadRequest("Column is null");
+        
         // escape single quotes
         string placeholder = column.Placeholder.Replace("'", "''");
         string description = column.Description.Replace("'", "''");

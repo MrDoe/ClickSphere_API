@@ -15,6 +15,13 @@ namespace ClickSphere_API.Services
         /// <returns>A ParsedQuery object containing the parsed query information.</returns>
         public ParsedQuery Parse(string query)
         {
+            // cut everthing before the first SELECT
+            var indexOfSelect = query.IndexOf("SELECT", StringComparison.OrdinalIgnoreCase);
+            if (indexOfSelect != -1)
+            {
+                query = query[indexOfSelect..];
+            }
+            
             // cut semi-colon from the end of the query
             if (query.Trim().EndsWith(';'))
             {

@@ -127,7 +127,11 @@ public class DbService : IDbService
             var row = new Dictionary<string, object>();
             for (var i = 0; i < reader.FieldCount; i++)
             {
-                row.Add(reader.GetName(i), reader.GetValue(i));
+                // convert NaN to null
+                if (reader.GetValue(i).ToString() == "NaN")
+                    row.Add(reader.GetName(i), "NaN");
+                else
+                    row.Add(reader.GetName(i), reader.GetValue(i));
             }
             result.Add(row);
         }
