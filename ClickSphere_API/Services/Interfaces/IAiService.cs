@@ -1,4 +1,5 @@
 namespace ClickSphere_API.Services;
+
 /// <summary>
 /// Represents an interface for an AI service.
 /// </summary>
