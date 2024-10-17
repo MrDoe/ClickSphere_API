@@ -222,8 +222,12 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
                 "DateTime" or "DateTime64(3)" => "DateTime",
                 _ => "TextBox",
             };
+
+            // escape single quotes from data type
+            string dataType = col["Data Type"].ToString()?.Replace("'", "''") ?? "";
+            
             string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter) " +
-                                 $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{col["Data Type"]}','{controlType}',{sorter});";
+                                 $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{dataType}','{controlType}',{sorter});";
 
             await _dbService.ExecuteNonQuery(insertQuery);
             ++sorter;

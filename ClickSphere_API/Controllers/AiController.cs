@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
+using ClickSphere_API.Models;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
@@ -35,6 +36,11 @@ public class AiController(IAiService AiService) : ControllerBase
     [HttpPost]
     public async Task<string> GenerateQuery(GenerateQueryRequest request)
     {
+        if(request.Question == null || request.Database == null || request.Table == null)
+        {
+            return "Invalid request";
+        }
+
         // Call the Ollama API
         string response = await AiService.GenerateQuery(request.Question, request.Database, request.Table);        
         return response;
@@ -86,5 +92,33 @@ public class AiController(IAiService AiService) : ControllerBase
         // Call the Ollama API
         IDictionary<string, string> response = await AiService.GetColumnDescriptions(database, table);
         return response;
+    }
+
+    /// <summary>
+    /// Get the system configuration.
+    /// </summary>
+    /// <returns>The system configuration.</returns>
+    [Authorize]
+    [Route("/getAiConfig")]
+    [HttpGet]
+    public AiConfig GetAiConfig()
+    {
+        // Call the Ollama API
+        AiConfig response = AiService.GetAiConfig();
+        return response;
+    }
+
+    /// <summary>
+    /// Set the system configuration.
+    /// </summary>
+    /// <param name="config">The system configuration.</param>
+    /// <returns>The system configuration.</returns>
+    [Authorize]
+    [Route("/setAiConfig")]
+    [HttpPost]
+    public async Task SetAiConfig(AiConfig config)
+    {
+        // Call the Ollama API
+        await AiService.SetAiConfig(config);
     }
 }
