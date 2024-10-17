@@ -1,3 +1,4 @@
+using System.Reflection;
 using Octonica.ClickHouseClient;
 namespace ClickSphere_API.Services;
 
@@ -224,7 +225,31 @@ public class DbService : IDbService
     {
         //await DeleteDatabase();
 
-        string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
+        // get version from csproj file
+        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+
+        string query = "SELECT Value FROM ClickSphere.Config WHERE Key = 'Version' and Section = 'ClickSphere'";
+        object? result = await ExecuteScalar(query);
+
+        if(result is DBNull)
+        {
+            query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('Version', '{version}', 'ClickSphere')";
+            await ExecuteNonQuery(query);
+        }
+        else
+        {
+            if(result != null && result.ToString() != version)
+            {
+                query = $"UPDATE ClickSphere.Config SET Value = '{version}' WHERE Key = 'Version' and Section = 'ClickSphere'";
+                await ExecuteNonQuery(query);
+            }
+            else
+            {
+                return;
+            }
+        }
+
+        query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
         await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String, Role String) ENGINE = MergeTree() PRIMARY KEY(Id)";
@@ -232,7 +257,7 @@ public class DbService : IDbService
 
         // check if default user in ClickSphere.Users exists
         query = "SELECT UserName FROM ClickSphere.Users WHERE UserName = 'default'";
-        object? result = await ExecuteScalar(query);
+        result = await ExecuteScalar(query);
 
         if (result is DBNull)
         {
@@ -253,6 +278,73 @@ public class DbService : IDbService
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
         await ExecuteNonQuery(query);
+
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Config (Key String, Value String, Section String) ENGINE = MergeTree() PRIMARY KEY(Key, Section)";
+        await ExecuteNonQuery(query);
+
+        // check if AI Configuration exists
+        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'AiConfig'";
+        result = await ExecuteScalar(query);
+
+        if (result is DBNull)
+        {
+            await InsertAiConfig();
+        }
+    }
+
+    /// <summary>
+    /// Insert the AI Configuration into the ClickSphere database
+    /// </summary>
+    private async Task InsertAiConfig()
+    {
+       // insert AI Configuration
+        string query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaUrl', 'http://localhost:11434', 'AiConfig')";
+        await ExecuteNonQuery(query);
+
+        query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaModel', 'codegemma', 'AiConfig')";
+        await ExecuteNonQuery(query);
+
+        string systemPrompt = 
+        """
+        # IDENTITY and PURPOSE
+
+        Translate natural text in English or German to ClickHouse SQL queries (Text2SQL).
+        Be an expert in ClickHouse SQL databases.
+        Be an expert in clinical and medical data and terminology in German and English.
+        Use ClickHouse SQL references, tutorials, and documentation to generate valid ClickHouse SQL queries.
+
+        # STEPS
+
+        - Analyze the given table schema and identify the necessary columns. Use column descriptions to understand the expected data.
+        - Use only the columns provided in the table schema to generate the query.
+        - Analyze the question and identify the specific ClickHouse SQL instructions and functions needed.
+        - Use the ClickHouse SQL Reference to validate all possible ClickHouse SQL functions and data types.
+        - Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
+        - Ensure all functions and data types used in the query are valid ClickHouse SQL functions and data types.
+        - Ensure the correct number of arguments and data types are used in functions.
+        - Ensure all column names in the query match exactly as written in the table schema.
+        - Write ClickHouse function names in camelCase format (e.g., toDate, toDateTime). Start function names with a lowercase letter.
+        - Do not write any comments with dashes (--) in the query.
+        - Translate diagnoses provided as text into the respective ICD-10 codes, if needed.
+        - Split up diagnoses from the question into their respective words (e.g., 'lung cancer' -> '%lung%', '%cancer%').
+        - Append 'If' (like countIf, sumIf, avgIf, etc.) to the function name if needed.
+
+        # OUTPUT INSTRUCTIONS
+
+        - Ask the user for clarification if the question is unclear or ambiguous.
+        - Deny questions that require columns not present or not calculatable from the table schema.
+        - If an ClickHouse SQL query can be generated, output the SQL query only without comments.
+
+        # INPUT
+        - Table name: `[_TABLE_NAME_]`
+        - Table schema: `[_TABLE_SCHEMA_]`
+
+        # QUESTION
+        """;
+        systemPrompt = systemPrompt.Replace("\n", "\\n").Replace("'", "''");
+
+        query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('SystemPrompt', '{systemPrompt}', 'AiConfig')";
+            await ExecuteNonQuery(query);
     }
 
     /// <summary>

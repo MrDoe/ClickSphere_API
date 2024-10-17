@@ -1,3 +1,5 @@
+using ClickSphere_API.Models;
+
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -45,4 +47,17 @@ public interface IAiService
     /// <param name="table">The name of the table.</param>
     /// <returns>The column descriptions for the specified table.</returns>
     Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table);
+
+    /// <summary>
+    /// Sets the AI configuration.
+    /// </summary>
+    /// <param name="config">The AI configuration to set.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task SetAiConfig(AiConfig config);
+
+    /// <summary>
+    /// Gets the AI configuration.
+    /// </summary>
+    /// <returns>The AI configuration.</returns>
+    AiConfig GetAiConfig();
 }

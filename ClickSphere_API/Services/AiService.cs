@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using ClickSphere_API.Models.Requests;
 using System.Text.Json.Serialization;
+using ClickSphere_API.Models;
 //using Microsoft.AspNetCore.Mvc.ViewEngines;
 //using Microsoft.AspNetCore.Mvc.ApplicationModels;
 
@@ -85,7 +86,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
         OllamaRequest request = new()
         {
-            model = "gemma2",
+            model = "sqlcoder:15b",
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -153,7 +154,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
         var request = new OllamaRequest
         {
-            model = "codegemma:7b-instruct",
+            model = "sqlcoder:15b",
             system = systemPrompt,
             prompt = question + promptAddition,
             stream = false,
@@ -323,7 +324,7 @@ Precisely follow the instructions given to you.
 
         var request = new OllamaRequest
         {
-            model = "codegemma:7b-instruct",
+            model = "sqlcoder:15b",
             system = systemPrompt,
             prompt = prompt.ToString(),
             stream = false,
@@ -442,7 +443,7 @@ Be concise and precise.
 
         var request = new OllamaRequest
         {
-            model = "codegemma:7b-instruct",
+            model = "sqlcoder:15b",
             system = systemPrompt,
             prompt = prompt.ToString(),
             stream = false,
@@ -491,6 +492,66 @@ Be concise and precise.
         else
         {
             throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+        }
+    }
+
+    /// <summary>
+    /// Get the system configuration
+    /// </summary>
+    /// <returns>The system configuration from the database</returns>
+    public AiConfig GetAiConfig()
+    {
+        string sql = "SELECT Key, Value FROM ClickSphere.Config WHERE Section = 'AiConfig' order by Key";
+        var result = DbService.ExecuteQueryDictionary(sql).Result;
+
+        AiConfig config = new();
+
+        if (result.Count == 0)
+            return config;
+        
+        foreach(var row in result)
+        {
+            if (row.ContainsKey("Key") && row.ContainsKey("Value"))
+            {
+                string? key = row["Key"]?.ToString();
+                string? value = row["Value"]?.ToString();
+
+                if (key == "OllamaUrl")
+                    config.OllamaUrl = value;
+                else if (key == "OllamaModel")
+                    config.OllamaModel = value;
+                else if (key == "SystemPrompt")
+                    config.SystemPrompt = value;
+            }
+        }
+        return config;
+    }
+
+    /// <summary>
+    /// Set the system configuration
+    /// </summary>
+    /// <param name="config">The system configuration to set</param>
+    /// <returns>True if the configuration was set successfully</returns>
+    public async Task SetAiConfig(AiConfig config)
+    {
+        // escape single quotes in the strings
+        config.SystemPrompt = config.SystemPrompt?.Replace("'", "''");
+
+        try
+        {
+            // update ClickSphere.Config table (KEY, VALUE, SECTION)
+            string sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaUrl}' WHERE Key = 'OllamaUrl' AND Section = 'AiService'";
+            await DbService.ExecuteNonQuery(sql);
+
+            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaModel}' WHERE Key = 'OllamaModel' AND Section = 'AiService'";
+            await DbService.ExecuteNonQuery(sql);
+
+            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.SystemPrompt}' WHERE Key = 'SystemPrompt' AND Section = 'AiService'";
+            await DbService.ExecuteNonQuery(sql);
+        }
+        catch (Exception e)
+        {
+            throw new Exception($"Error updating AiConfig: {e.Message}");
         }
     }
 }
