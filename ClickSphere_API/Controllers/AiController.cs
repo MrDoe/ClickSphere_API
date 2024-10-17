@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 namespace ClickSphere_API.Controllers;
@@ -14,6 +15,7 @@ public class AiController(IAiService AiService) : ControllerBase
     /// </summary>
     /// <param name="question" example="How can I create a new table?">The question to ask.</param>
     /// <returns>The answer to the question.</returns>
+    [Authorize]
     [Route("/ask")]
     [HttpPost]
     public async Task<string> Ask(string question)
@@ -28,6 +30,7 @@ public class AiController(IAiService AiService) : ControllerBase
     /// </summary>
     /// <param name="request">The request to generate a query.</param>
     /// <returns>The answer to the question.</returns>
+    [Authorize]
     [Route("/generateQuery")]
     [HttpPost]
     public async Task<string> GenerateQuery(GenerateQueryRequest request)
@@ -44,6 +47,7 @@ public class AiController(IAiService AiService) : ControllerBase
     /// <param name="database" example="default">The database to execute the query on.</param>
     /// <param name="table" example="trips">The table to ask the question about.</param>
     /// <returns>The result of the query execution.</returns>
+    [Authorize]
     [Route("/generateAndExecuteQuery")]
     [HttpPost]
     public async Task<string> GenerateAndExecuteQuery(string question, string database, string table)
@@ -59,12 +63,28 @@ public class AiController(IAiService AiService) : ControllerBase
     /// <param name="database" example="default">The name of the database.</param>
     /// <param name="table" example="trips">The name of the table.</param>
     /// <returns>The list of possible questions.</returns>
+    [Authorize]
     [Route("/getPossibleQuestions")]
     [HttpGet]
     public async Task<IList<string>> GetPossibleQuestions(string database, string table)
     {
         // Call the Ollama API
         IList<string> response = await AiService.GetPossibleQuestions(database, table);
+        return response;
+    }
+
+    /// <summary>
+    /// Get column descriptions for the specified table.
+    /// </summary>
+    /// <param name="database" example="default">The name of the database.</param>
+    /// <param name="table" example="trips">The name of the table.</param>
+    /// <returns>The dictionary of column descriptions.</returns>
+    [Route("/getColumnDescriptions")]
+    [HttpGet]
+    public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
+    {
+        // Call the Ollama API
+        IDictionary<string, string> response = await AiService.GetColumnDescriptions(database, table);
         return response;
     }
 }

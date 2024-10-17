@@ -37,4 +37,12 @@ public interface IAiService
     /// <param name="table"></param>
     /// <returns></returns>
     Task<IList<string>> GetPossibleQuestions(string database, string table);
+
+    /// <summary>
+    /// Gets the column descriptions for the specified table.
+    /// </summary>
+    /// <param name="database">The name of the database.</param>
+    /// <param name="table">The name of the table.</param>
+    /// <returns>The column descriptions for the specified table.</returns>
+    Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table);
 }
