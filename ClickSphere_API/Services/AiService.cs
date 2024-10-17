@@ -43,9 +43,9 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
 # OUTPUT INSTRUCTIONS
 
-- Double-check the query to ensure it is valid ClickHouse SQL and provides the desired output.
-- Output the SQL query only. No comments.
-- Ask for clarification if the question is unclear or ambiguous or a column is missing in the table schema.
+- Ask the user for clarification if the question is unclear or ambiguous.
+- Deny questions that require columns not present or not calculatable from the table schema.
+- If an ClickHouse SQL query can be generated, output the SQL query only without comments.
 
 # INPUT
 - Table name: `[_TABLE_NAME_]`
@@ -53,7 +53,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
 # QUESTION
 """;
-    private readonly string promptAddition = " Keep it short and simple. Don't explain - output the SQL query only.";
+    private readonly string promptAddition = " Keep it short and simple.";
 
     private readonly JsonSerializerOptions jsonOptions = new()
     {
@@ -137,7 +137,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         using HttpClient client = new()
         {
             BaseAddress = new Uri(OllamaUrl),
-            Timeout = TimeSpan.FromSeconds(60)
+            Timeout = TimeSpan.FromSeconds(120)
         };
 
         // Add an Accept header for JSON format
@@ -153,7 +153,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
         var request = new OllamaRequest
         {
-            model = "codegemma",
+            model = "codegemma:7b-instruct",
             system = systemPrompt,
             prompt = question + promptAddition,
             stream = false,
@@ -262,7 +262,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 # IDENTITY and PURPOSE
 You are an expert for data analysis and medicial data.
 You are able to generate a list of related questions for analyzing a given dataset.
-Take a look at the Example Dataset given below.
+Take a look at the EXAMPLE DATASET given below.
 Precisely follow the instructions given to you.
 
 # TABLE SCHEMA
@@ -299,9 +299,9 @@ Precisely follow the instructions given to you.
             prompt.AppendLine();
         }
         prompt.AppendLine("# TASKS");
-        prompt.AppendLine("Generate a list of 5 to 10 related questions for analyzing the Example Dataset." + 
-                          "Only ask questions about columns of the Example Dataset. No explanations. No numberings. No bullet lists. " + 
-                          "Do not ask questions where columns are needed which are not present in the Example Dataset. " +
+        prompt.AppendLine("Generate a list of 5 to 10 related questions for analyzing the EXAMPLE DATASET." + 
+                          "Only ask questions about columns of the EXAMPLE DATASET. No explanations. No numberings. No bullet lists. " + 
+                          "Do not ask questions where columns are needed which are not present in the EXAMPLE DATASET. " +
                           "Output the questions only, separated by newline characters.");
 
         using HttpClient client = new()
@@ -323,7 +323,7 @@ Precisely follow the instructions given to you.
 
         var request = new OllamaRequest
         {
-            model = "codegemma",
+            model = "codegemma:7b-instruct",
             system = systemPrompt,
             prompt = prompt.ToString(),
             stream = false,
@@ -364,6 +364,129 @@ Precisely follow the instructions given to you.
                 return responseText.Split('\n').Select(x => x.Trim()).ToList();
             }
             return ["Unsuccessful generation of questions!"];
+        }
+        else
+        {
+            throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+        }
+    }
+
+    /// <summary>
+    /// Analyze the table and generate a list of column descriptions
+    /// </summary>
+    /// <param name="database">The database to get the table from</param>
+    /// <param name="table">The table to get the rows from</param>
+    /// <returns>Dictionary of column descriptions</returns>
+    public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
+    {
+        // get first 100 rows of the table
+        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+
+        // add table definition to the system prompt
+        string systemPrompt = """
+# IDENTITY and PURPOSE
+
+You are an expert for data analysis and medicial data.
+You are able to generate a list of descriptions for the columns of a given dataset.
+Take a look at the EXAMPLE DATASET given below.
+Be concise and precise.
+
+# EXAMPLE DATASET
+
+""";
+        // create a prompt with the table rows
+        StringBuilder prompt = new();
+
+        // generate column header
+        var columnHeaders = rows.First().Keys;
+        foreach (var column in columnHeaders)
+        {
+            prompt.Append($"\"{column}\"");
+            if (column != columnHeaders.Last())
+                prompt.Append(',');
+        }
+
+        prompt.AppendLine();
+
+        foreach (var row in rows)
+        {
+            if(row == rows.First())
+                continue;
+            
+            foreach (var column in row)
+            {
+                prompt.Append($"\"{column.Value}\",");
+            }
+            prompt.AppendLine();
+        }
+        prompt.AppendLine("\n# TASKS\n\n" + 
+                          "For every column in the EXAMPLE DATASET find an appropriate description.\n" + 
+                          "Output in the format: '[COLUMN1_NAME],[DESCRIPTION_1],\n[COLUMN2_NAME],[DESCRIPTION_2],\n...");
+
+        using HttpClient client = new()
+        {
+            BaseAddress = new Uri(OllamaUrl),
+            Timeout = TimeSpan.FromSeconds(120)
+        };
+
+        // Add an Accept header for JSON format
+        client.DefaultRequestHeaders.Accept.Clear();
+        var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
+        client.DefaultRequestHeaders.Accept.Add(mediaType);
+
+        // Create the JSON string for the request
+        var requestOptions = new OllamaRequestOptions
+        {
+            temperature = 0.0
+        };
+
+        var request = new OllamaRequest
+        {
+            model = "codegemma:7b-instruct",
+            system = systemPrompt,
+            prompt = prompt.ToString(),
+            stream = false,
+        };
+
+        string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
+
+        var jsonContent = new StringContent(
+            jsonRequest,
+            Encoding.UTF8,
+            mediaType);
+
+        // Send POST request to the Ollama API
+        HttpResponseMessage response = await client.PostAsync(OllamaApiPath, jsonContent);
+
+        if (response.IsSuccessStatusCode)
+        {
+            // Read the response object
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            if(jsonResponse == null)
+                return new Dictionary<string, string>() { { "ERROR", "No response from Ollama API!" } };
+            
+            var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
+
+            // Return the answer from the json object
+            if (jsonObject!.response != null)
+            {
+                string responseText = jsonObject.response.Trim();
+
+                // build dictionary from response ("column1,description1\n...")
+                var columnDescriptions = new Dictionary<string, string>();
+                var lines = responseText.Split('\n').Select(x => x.Trim()).ToList();
+                foreach (var line in lines)
+                {
+                    var parts = line.Split(',');
+                    if (parts.Length == 2)
+                    {
+                        columnDescriptions.Add(parts[0].Trim(), parts[1].Trim());
+                    }
+                }
+
+                return columnDescriptions;
+            }
+            return new Dictionary<string, string>() { { "ERROR", "Unsuccessful generation of column descriptions!" } };
         }
         else
         {

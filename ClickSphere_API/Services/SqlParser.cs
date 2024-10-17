@@ -21,11 +21,18 @@ namespace ClickSphere_API.Services
             {
                 query = query[indexOfSelect..];
             }
-            
-            // cut semi-colon from the end of the query
-            if (query.Trim().EndsWith(';'))
+            else
             {
-                query = query.Trim()[..(query.Length - 1)];
+                return new ParsedQuery { IsValid = false };
+            }
+
+            // trim query
+            query = query.Trim();
+
+            // cut semi-colon from the end of the query
+            if (query.EndsWith(';'))
+            {
+                query = query[..(query.Length - 1)];
             }
 
             // Convert the query to uppercase
@@ -56,12 +63,6 @@ namespace ClickSphere_API.Services
                 upperQuery.StartsWith("RENAME"))
             {
                 throw new ArgumentException("Data modifying statements are not allowed");
-            }
-
-            // Check if the query is a SELECT statement
-            if (!upperQuery.StartsWith("SELECT"))
-            {
-                return new ParsedQuery { IsValid = false };
             }
 
             // Split the query into words
@@ -102,7 +103,7 @@ namespace ClickSphere_API.Services
             return MyRegex().IsMatch(name);
         }
 
-        [GeneratedRegex(@"^[\*a-zA-Z0-9_\s`'""@!=<>\(\)%\.\,:\-\/\+]+$")]
+        [GeneratedRegex(@"^[\*a-zA-Z0-9_\s`'""@!=<>\(\)%\.\,:\-\/\+\%]+$")]
         private static partial Regex MyRegex();
     }
 
