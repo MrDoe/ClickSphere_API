@@ -30,7 +30,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 - Analyze the given table schema and identify the necessary columns. Use column descriptions to understand the expected data.
 - Use only the columns provided in the table schema to generate the query.
 - Analyze the question and identify the specific ClickHouse SQL instructions and functions needed.
-- Use the ClickHouse SQL Reference to validate all possible ClickHouse SQL functions and data types.
+- Use the ClickHouse SQL Reference and tutorials to validate all possible ClickHouse SQL functions and data types.
 - Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
 - Ensure all functions and data types used in the query are valid ClickHouse SQL functions and data types.
 - Ensure the correct number of arguments and data types are used in functions.
