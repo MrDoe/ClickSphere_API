@@ -228,7 +228,13 @@ public class DbService : IDbService
         // get version from csproj file
         string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
 
-        string query = "SELECT Value FROM ClickSphere.Config WHERE Key = 'Version' and Section = 'ClickSphere'";
+        string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
+        await ExecuteNonQuery(query);
+
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Config (Key String, Value String, Section String) ENGINE = MergeTree() PRIMARY KEY(Key, Section)";
+        await ExecuteNonQuery(query);
+
+        query = "SELECT Value FROM ClickSphere.Config WHERE Key = 'Version' and Section = 'ClickSphere'";
         object? result = await ExecuteScalar(query);
 
         if(result is DBNull)
@@ -248,9 +254,6 @@ public class DbService : IDbService
                 return;
             }
         }
-
-        query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
-        await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String, Role String) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
@@ -277,9 +280,6 @@ public class DbService : IDbService
         await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
-        await ExecuteNonQuery(query);
-
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Config (Key String, Value String, Section String) ENGINE = MergeTree() PRIMARY KEY(Key, Section)";
         await ExecuteNonQuery(query);
 
         // check if AI Configuration exists
