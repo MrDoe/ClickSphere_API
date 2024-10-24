@@ -245,8 +245,8 @@ public partial class AiService : IAiService
     /// <returns>List of possible questions</returns>
     public async Task<IList<string>> GetPossibleQuestions(string database, string table)
     {
-        // get first 100 rows of the table
-        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+        // get 20 random rows from the table
+        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} ORDER BY rand() LIMIT 20");
 
         // get source table definition from database
         string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
@@ -296,9 +296,9 @@ Precisely follow the instructions given to you.
             prompt.AppendLine();
         }
         prompt.AppendLine("# TASKS");
-        prompt.AppendLine("Generate a list of 5 to 10 related questions for analyzing the EXAMPLE DATASET." + 
+        prompt.AppendLine("Generate a list of 10 related questions for analyzing the EXAMPLE DATASET." + 
                           "Only ask questions about columns of the EXAMPLE DATASET. No explanations. No numberings. No bullet lists. " + 
-                          "Do not ask questions where columns are needed which are not present in the EXAMPLE DATASET. " +
+                          "Don't ask questions where columns are needed which are not present in the EXAMPLE DATASET. " +
                           "Output the questions only, separated by newline characters.");
 
         using HttpClientHandler handler = new()
@@ -319,7 +319,8 @@ Precisely follow the instructions given to you.
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0
+            temperature = 0.0,
+            num_ctx = 8192
         };
 
         var request = new OllamaRequest
