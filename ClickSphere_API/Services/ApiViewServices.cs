@@ -253,10 +253,10 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
 
         // create view definition as CSV
         StringBuilder csv = new();
-        csv.AppendLine("Column Name,Data Type,Description");
+        csv.AppendLine("ColumnName, ColumnDataType, ColumnDescription");
         foreach (var row in output)
         {
-            csv.AppendLine($"{row["ColumnName"]},{row["DataType"]},{row["Description"]}");
+            csv.AppendLine($"{row["ColumnName"]}, {row["DataType"]}, {row["Description"]}");
         }
 
         return csv.ToString();

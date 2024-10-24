@@ -12,50 +12,35 @@ namespace ClickSphere_API.Services;
 /// <summary>
 /// Ai service class to connect to Ollama
 /// </summary>
-public partial class AiService(IDbService dbService, IApiViewService viewService) : IAiService
+public partial class AiService : IAiService
 {
-    private readonly IDbService DbService = dbService;
-    private readonly IApiViewService? ViewService = viewService;
-    private readonly string OllamaUrl = "http://localhost:11434";
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AiService"/> class.
+    /// </summary>
+    public AiService(IDbService dbService, IApiViewService viewService)
+    {
+        DbService = dbService;
+        ViewService = viewService;
+        AiConfig = GetAiConfig();
+    }
+
+    /// <summary>
+    /// Sets the AI configuration.
+    /// </summary>
+    public void SetAiConfig()
+    {
+        AiConfig = GetAiConfig();
+        if(string.IsNullOrEmpty(AiConfig.OllamaUrl) || string.IsNullOrEmpty(AiConfig.OllamaModel))
+        {
+            throw new Exception("Error: Ollama URL or model not set in the configuration!");
+        }
+    }
+
+    private IDbService? DbService { get; set; }
+    private IApiViewService? ViewService { get; set; }
     private readonly string OllamaApiPath = "api/generate";
-    private readonly string SystemPrompt = """
-# IDENTITY and PURPOSE
-
-Translate natural text in English or German to ClickHouse SQL queries (Text2SQL).
-Be an expert in ClickHouse SQL databases.
-Be an expert in clinical and medical data and terminology in German and English.
-Use ClickHouse SQL references, tutorials, and documentation to generate valid ClickHouse SQL queries.
-
-# STEPS
-
-- Analyze the given table schema and identify the necessary columns. Use column descriptions to understand the expected data.
-- Use only the columns provided in the table schema to generate the query.
-- Analyze the question and identify the specific ClickHouse SQL instructions and functions needed.
-- Use the ClickHouse SQL Reference and tutorials to validate all possible ClickHouse SQL functions and data types.
-- Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
-- Ensure all functions and data types used in the query are valid ClickHouse SQL functions and data types.
-- Ensure the correct number of arguments and data types are used in functions.
-- Ensure all column names in the query match exactly as written in the table schema.
-- Write ClickHouse function names in camelCase format (e.g., toDate, toDateTime). Start function names with a lowercase letter.
-- Do not write any comments with dashes (--) in the query.
-- Translate diagnoses provided as text into the respective ICD-10 codes, if needed.
-- Split up diagnoses from the question into their respective words (e.g., 'lung cancer' -> '%lung%', '%cancer%').
-- Append 'If' (like countIf, sumIf, avgIf, etc.) to the function name if needed.
-
-# OUTPUT INSTRUCTIONS
-
-- Ask the user for clarification if the question is unclear or ambiguous.
-- Deny questions that require columns not present or not calculatable from the table schema.
-- If an ClickHouse SQL query can be generated, output the SQL query only without comments.
-
-# INPUT
-- Table name: `[_TABLE_NAME_]`
-- Table schema: `[_TABLE_SCHEMA_]`
-
-# QUESTION
-""";
-    private readonly string promptAddition = " Keep it short and simple.";
-
+    private AiConfig AiConfig { get; set; }
+    private readonly string promptAddition = " Keep it short and as simple as possible.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -70,11 +55,15 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     /// <param name="question"></param>
     /// <returns></returns>
     public async Task<string> Ask(string question)
-    {
-        using HttpClient client = new()
+    {        
+        using HttpClientHandler handler = new()
         {
-            BaseAddress = new Uri(OllamaUrl),
-            Timeout = TimeSpan.FromSeconds(30)
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(60)
         };
 
         // Add an Accept header for JSON format.
@@ -86,7 +75,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
         OllamaRequest request = new()
         {
-            model = "sqlcoder:15b",
+            model = "codegemma:instruct",
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -132,12 +121,18 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
             return "ERROR: Invalid table name!";
 
         // add table definition to the system prompt
-        string systemPrompt = SystemPrompt.Replace("[_TABLE_NAME_]", $"{database}.{table}");
+        string systemPrompt = AiConfig.SystemPrompt!;
+        systemPrompt = systemPrompt.Replace("[_TABLE_NAME_]", $"{database}.{table}");
         systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
 
-        using HttpClient client = new()
+        using HttpClientHandler handler = new()
         {
-            BaseAddress = new Uri(OllamaUrl),
+            UseProxy = false
+        };
+
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -149,15 +144,16 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0
+            temperature = 0.0,
+            num_ctx = 8192
         };
 
         var request = new OllamaRequest
         {
-            model = "sqlcoder:15b",
+            model = "codegemma:instruct",
             system = systemPrompt,
             prompt = question + promptAddition,
-            stream = false,
+            stream = false
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
@@ -230,7 +226,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         try
         {
             // execute the query
-            var result = await DbService.ExecuteQueryDictionary(query);
+            var result = await DbService!.ExecuteQueryDictionary(query);
 
             // return the result as json string
             return JsonSerializer.Serialize(result);
@@ -250,7 +246,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     public async Task<IList<string>> GetPossibleQuestions(string database, string table)
     {
         // get first 100 rows of the table
-        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
 
         // get source table definition from database
         string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
@@ -271,7 +267,7 @@ Precisely follow the instructions given to you.
 
 # EXAMPLE DATASET
 """;
-        
+
         systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
 
         // create a prompt with the table rows
@@ -305,9 +301,13 @@ Precisely follow the instructions given to you.
                           "Do not ask questions where columns are needed which are not present in the EXAMPLE DATASET. " +
                           "Output the questions only, separated by newline characters.");
 
-        using HttpClient client = new()
+        using HttpClientHandler handler = new()
         {
-            BaseAddress = new Uri(OllamaUrl),
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(60)
         };
 
@@ -324,7 +324,7 @@ Precisely follow the instructions given to you.
 
         var request = new OllamaRequest
         {
-            model = "sqlcoder:15b",
+            model = "codegemma:instruct",
             system = systemPrompt,
             prompt = prompt.ToString(),
             stream = false,
@@ -381,7 +381,7 @@ Precisely follow the instructions given to you.
     public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
     {
         // get first 100 rows of the table
-        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
 
         // add table definition to the system prompt
         string systemPrompt = """
@@ -424,9 +424,14 @@ Be concise and precise.
                           "For every column in the EXAMPLE DATASET find an appropriate description.\n" + 
                           "Output in the format: '[COLUMN1_NAME],[DESCRIPTION_1],\n[COLUMN2_NAME],[DESCRIPTION_2],\n...");
 
-        using HttpClient client = new()
+        using HttpClientHandler handler = new()
         {
-            BaseAddress = new Uri(OllamaUrl),
+            UseProxy = false
+        };
+
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -443,7 +448,7 @@ Be concise and precise.
 
         var request = new OllamaRequest
         {
-            model = "sqlcoder:15b",
+            model = "codegemma:instruct",
             system = systemPrompt,
             prompt = prompt.ToString(),
             stream = false,
@@ -502,7 +507,7 @@ Be concise and precise.
     public AiConfig GetAiConfig()
     {
         string sql = "SELECT Key, Value FROM ClickSphere.Config WHERE Section = 'AiConfig' order by Key";
-        var result = DbService.ExecuteQueryDictionary(sql).Result;
+        var result = DbService!.ExecuteQueryDictionary(sql).Result;
 
         AiConfig config = new();
 
@@ -540,14 +545,14 @@ Be concise and precise.
         try
         {
             // update ClickSphere.Config table (KEY, VALUE, SECTION)
-            string sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaUrl}' WHERE Key = 'OllamaUrl' AND Section = 'AiService'";
-            await DbService.ExecuteNonQuery(sql);
+            string sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaUrl}' WHERE Key = 'OllamaUrl' AND Section = 'AiConfig'";
+            await DbService!.ExecuteNonQuery(sql);
 
-            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaModel}' WHERE Key = 'OllamaModel' AND Section = 'AiService'";
-            await DbService.ExecuteNonQuery(sql);
+            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaModel}' WHERE Key = 'OllamaModel' AND Section = 'AiConfig'";
+            await DbService!.ExecuteNonQuery(sql);
 
-            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.SystemPrompt}' WHERE Key = 'SystemPrompt' AND Section = 'AiService'";
-            await DbService.ExecuteNonQuery(sql);
+            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.SystemPrompt}' WHERE Key = 'SystemPrompt' AND Section = 'AiConfig'";
+            await DbService!.ExecuteNonQuery(sql);
         }
         catch (Exception e)
         {
