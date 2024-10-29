@@ -75,7 +75,7 @@ public partial class AiService : IAiService
 
         OllamaRequest request = new()
         {
-            model = "codegemma:instruct",
+            model = AiConfig.OllamaModel!,
             prompt = question,
             stream = false,
             system = systemPrompt
@@ -150,7 +150,7 @@ public partial class AiService : IAiService
 
         var request = new OllamaRequest
         {
-            model = "codegemma:instruct",
+            model = AiConfig.OllamaModel!,
             system = systemPrompt,
             prompt = question + promptAddition,
             stream = false
@@ -325,7 +325,7 @@ Precisely follow the instructions given to you.
 
         var request = new OllamaRequest
         {
-            model = "codegemma:instruct",
+            model = AiConfig.OllamaModel!,
             system = systemPrompt,
             prompt = prompt.ToString(),
             stream = false,
@@ -449,7 +449,7 @@ Be concise and precise.
 
         var request = new OllamaRequest
         {
-            model = "codegemma:instruct",
+            model = AiConfig.OllamaModel!,
             system = systemPrompt,
             prompt = prompt.ToString(),
             stream = false,
