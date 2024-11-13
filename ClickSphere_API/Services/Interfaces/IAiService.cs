@@ -24,15 +24,6 @@ public interface IAiService
     Task<string> GenerateQuery(string question, string database, string table);
 
     /// <summary>
-    /// Generates and executes a query based on the question, database, and table provided.
-    /// </summary>
-    /// <param name="question">The question to generate and execute the query for.</param>
-    /// <param name="database">The name of the database.</param>
-    /// <param name="table">The name of the table.</param>
-    /// <returns>The result of executing the query.</returns>
-    Task<string> GenerateAndExecuteQuery(string question, string database, string table);
-
-    /// <summary>
     ///  Gets the possible questions that can be asked to the AI service based on the database and table provided.
     /// </summary>
     /// <param name="database"></param>
@@ -60,4 +51,13 @@ public interface IAiService
     /// </summary>
     /// <returns>The AI configuration.</returns>
     AiConfig GetAiConfig();
+
+    /// <summary>
+    /// Gets the similar queries based on the question provided.
+    /// </summary>
+    /// <param name="question">The question to get similar queries for.</param>
+    /// <param name="database">The name of the database.</param>
+    /// <param name="table">The name of the table.</param>
+    /// <returns>The list of similar queries.</returns>
+    Task<IList<string>> GetSimilarQueries(string question, string database, string table);
 }

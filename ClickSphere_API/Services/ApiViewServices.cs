@@ -6,9 +6,13 @@ namespace ClickSphere_API.Services;
 /// Service class for handling view operations.
 /// </summary>
 /// <param name="dbService"></param>
-public class ApiViewServices(IDbService dbService) : IApiViewService
+public class ApiViewServices(IDbService dbService, IConfiguration configuration) : IApiViewService
 {
     private readonly IDbService _dbService = dbService;
+    private readonly string ODBC_DSN = configuration["ODBC:DSN"] ?? "";
+    private readonly string ODBC_User = configuration["ODBC:User"] ?? "";
+    private readonly string ODBC_Password = configuration["ODBC:Password"] ?? "";
+    private readonly string ODBC_Database = configuration["ODBC:Database"] ?? "";
 
     /// <summary>
     /// Create a new view in the specified database
@@ -110,7 +114,8 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
     {
         return await _dbService.ExecuteQueryList<View>("SELECT c.*, s.database as Database, s.as_select as Query " +
                                                        "FROM system.tables s JOIN ClickSphere.Views c ON c.Id = s.name " +
-                                                       $"WHERE s.database = '{database}' and s.engine = 'View'");
+                                                       $"WHERE s.database = '{database}' and (s.engine = 'View' or s.engine = 'Table') " +
+                                                       "ORDER BY c.Name");
     }
 
     /// <summary>
@@ -139,9 +144,14 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
         // update view in CV_Views table
         if (result == 0)
         {
+            // escape single quotes
+            view.Description = view.Description!.Replace("'", "''");
+            view.Questions = view.Questions!.Replace("'", "''");
+
             string updateQuery = $"ALTER TABLE ClickSphere.Views " + 
                                  $"UPDATE Name = '{view.Name}', " + 
                                  $"Description = '{view.Description}', " + 
+                                 $"Type = '{view.Type}', " +
                                  $"Questions = '{view.Questions}' " + 
                                  $"WHERE Id = '{view.Id}';";
             int updateResult = await _dbService.ExecuteNonQuery(updateQuery);
@@ -273,8 +283,8 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
             return Results.BadRequest("Column is null");
         
         // escape single quotes
-        string placeholder = column.Placeholder.Replace("'", "''");
-        string description = column.Description.Replace("'", "''");
+        string placeholder = column.Placeholder!.Replace("'", "''");
+        string description = column.Description!.Replace("'", "''");
 
         string query = $"ALTER TABLE ClickSphere.ViewColumns " +
                        $"UPDATE ControlType = '{column.ControlType}', " +
@@ -300,5 +310,171 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
     public async Task<IList<string>> GetDistinctValues(string database, string viewId, string column)
     {
         return await _dbService.ExecuteQuery($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 50") ?? [];
+    }
+
+     /// <summary>
+    /// Import view from ODBC table into ClickHouse.
+    /// </summary>
+    /// <param name="view">The view name</param>
+    /// <param name="dropExisting">Whether to drop the existing view</param>
+    /// <returns>ok if the view was imported successfully, error message otherwise</returns>
+    public async Task<string> ImportViewFromODBC(string view, bool dropExisting = false)
+    {
+        if (string.IsNullOrEmpty(view))
+        {
+            return "Invalid request";
+        }
+
+        // check if system table
+        if(view == "Views" || view == "ViewColumns" || view == "Embeddings" || view == "Config" || view == "Users")
+        {
+            return "System tables cannot be imported";
+        }
+
+        // We need this view on our server:
+        // --------------------------------
+        // CREATE VIEW V_VIEW_COLUMNS AS
+        // SELECT 
+        //     TABLE_NAME,
+        //     COLUMN_NAME,
+        //     DATA_TYPE,
+        //     CHARACTER_MAXIMUM_LENGTH,
+        //     IS_NULLABLE
+        // FROM 
+        //     INFORMATION_SCHEMA.COLUMNS
+    
+        string odbcConnectionString = $"DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};";
+        
+        // get columns from ODBC view
+        IList<Dictionary<string, object>> columns;
+        string query =
+         "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE " + 
+        $"FROM odbc('{odbcConnectionString}', 'dbo', 'V_VIEW_COLUMNS') " +
+        $"WHERE TABLE_NAME = '{view}';";
+
+        try
+        {
+            columns = await _dbService.ExecuteQueryDictionary(query);        
+        }
+        catch (Exception e)
+        {
+            return e.Message;
+        }
+    
+        // convert from MS SQL to ClickHouse data types
+        foreach (var column in columns)
+        {
+            string dataType = column["DATA_TYPE"].ToString() ?? "String";
+            string chDataType = dataType switch
+            {
+                "tinyint" => "UInt8",
+                "smallint" => "Int16",
+                "int" => "Int32",
+                "bigint" => "Int64",
+                "float" => "Float32",
+                "double" => "Float64",
+                "varchar" => "String",
+                "datetime" => "DateTime64",
+                "date" => "DateTime64",
+                "time" => "DateTime64",
+                "bit" => "UInt8",
+                "decimal" => "Decimal",
+                "numeric" => "Decimal",
+                "char" => "String",
+                "nvarchar" => "String",
+                "nchar" => "String",
+                "ntext" => "String",
+                "text" => "String",
+                "uniqueidentifier" => "UUID",
+                "real" => "Float32",
+                "money" => "Decimal",
+                "smallmoney" => "Decimal",
+                "binary" => "String",
+                "varbinary" => "String",
+                "image" => "String",
+                "timestamp" => "String",
+                "xml" => "String",
+                "geography" => "String",
+                "geometry" => "String",
+                "hierarchyid" => "String",
+                "sql_variant" => "String",
+                "sysname" => "String",
+                "datetime2" => "DateTime64",
+                "datetimeoffset" => "DateTime64",
+                "smalldatetime" => "DateTime64",
+                _ => "String"
+            };
+            
+            // add length to data type
+            if (!string.IsNullOrEmpty(column["CHARACTER_MAXIMUM_LENGTH"].ToString()))
+                chDataType += $"({column["CHARACTER_MAXIMUM_LENGTH"]})";
+            
+            column["DATA_TYPE"] = chDataType;
+        }
+
+        if (dropExisting)
+        {
+            query = $"DROP TABLE IF EXISTS ClickSphere.{view}_TBL;";
+            await _dbService.ExecuteNonQuery(query);
+
+            query = $"DELETE FROM ClickSphere.Views WHERE Name = '{view}';";
+            await _dbService.ExecuteNonQuery(query);
+        }
+
+        query = $"CREATE TABLE IF NOT EXISTS ClickSphere.{view}_TBL (";
+
+        // build create table statement
+        foreach (var column in columns)
+        {
+            query += $"{column["COLUMN_NAME"]} {column["DATA_TYPE"]} ";
+
+            if(column["IS_NULLABLE"].ToString() == "YES")
+                query += "NULL DEFAULT NULL";
+            else
+                query += "NOT NULL";
+            
+            // add comma if not last column
+            if (columns.IndexOf(column) < columns.Count - 1)
+                query += ", ";
+        }
+
+        // each view has an ID column
+        query += ") ENGINE = MergeTree() ORDER BY ID";
+
+        try 
+        {
+            await _dbService.ExecuteNonQuery(query);
+        }
+        catch (Exception e)
+        {
+            return e.Message;
+        }
+
+        // fill table with data
+        query = $"INSERT INTO ClickSphere.{view}_TBL " +
+                $"SELECT * FROM odbc('{odbcConnectionString}', '', '{view}');";
+
+        try
+        {
+            await _dbService.ExecuteNonQuery(query);
+        }
+        catch (Exception e)
+        {
+            return e.Message;
+        }
+
+        // add view configuration to ClickSphere.Views
+        await CreateView(new View
+        {
+            Id = view,
+            Name = view,
+            Description = "Imported via ODBC",
+            Database = "ClickSphere",
+            Query = $"SELECT * FROM ClickSphere.{view}_TBL",
+            Type = "V",
+            Questions = ""
+        });
+        
+        return "ok";
     }
 }

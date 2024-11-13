@@ -4,8 +4,6 @@ using System.Text.Json;
 using ClickSphere_API.Models.Requests;
 using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
-//using Microsoft.AspNetCore.Mvc.ViewEngines;
-//using Microsoft.AspNetCore.Mvc.ApplicationModels;
 
 namespace ClickSphere_API.Services;
 
@@ -201,6 +199,14 @@ public partial class AiService : IAiService
                     responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
 
+                // generate embedding for question and query
+                var embedding = await GenerateEmbedding(question, responseText);
+                if (embedding != null)
+                {
+                    // store embedding in ClickHouse database
+                    await StoreEmbedding(question, database, table, responseText, embedding);
+                }
+
                 return responseText;
             }
             return jsonObject.response ?? "Unsuccessful query generation!";
@@ -208,32 +214,6 @@ public partial class AiService : IAiService
         else
         {
             throw new Exception($"Error calling Ollama API: {response.StatusCode}");
-        }
-    }
-
-    /// <summary>
-    /// Generate a SQL query and execute it on the database
-    /// </summary>
-    /// <param name="question">The question to convert into a SQL query</param>
-    /// <param name="database">The database the query will run on.</param>
-    /// <param name="table">The table the query will run on.</param>
-    /// <returns>Result of the query.</returns>
-    public async Task<string> GenerateAndExecuteQuery(string question, string database, string table)
-    {
-        // generate the query
-        string query = await GenerateQuery(question, database, table);
-
-        try
-        {
-            // execute the query
-            var result = await DbService!.ExecuteQueryDictionary(query);
-
-            // return the result as json string
-            return JsonSerializer.Serialize(result);
-        }
-        catch (Exception e)
-        {
-            return e.Message + "\n\nQuery: " + query;
         }
     }
 
@@ -257,15 +237,18 @@ public partial class AiService : IAiService
         // add table definition to the system prompt
         string systemPrompt = """
 # IDENTITY and PURPOSE
+
 You are an expert for data analysis and medicial data.
 You are able to generate a list of related questions for analyzing a given dataset.
 Take a look at the EXAMPLE DATASET given below.
 Precisely follow the instructions given to you.
 
 # TABLE SCHEMA
+
 [_TABLE_SCHEMA_]
 
 # EXAMPLE DATASET
+
 """;
 
         systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
@@ -559,5 +542,137 @@ Be concise and precise.
         {
             throw new Exception($"Error updating AiConfig: {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// Generate embedding from user question and SQL query
+    /// </summary>
+    /// <param name="question">The user question</param>
+    /// <param name="query">The SQL query</param>
+    /// <returns>Embedding of the question and query</returns>
+    public async Task<List<List<float>>?> GenerateEmbedding(string question, string query)
+    {
+        // create a new HttpClient and HttpClientHandler
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(60)
+        };
+
+        // Add an Accept header for JSON format
+        client.DefaultRequestHeaders.Accept.Clear();
+        var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
+        client.DefaultRequestHeaders.Accept.Add(mediaType);
+
+        // Create the JSON string for the request
+        var requestOptions = new OllamaRequestOptions
+        {
+            temperature = 0.0
+        };
+
+        var request = new OllamaEmbed
+        {
+            model = "nomic-embed-text",
+            input = $"QUESTION: {question}\nSQL_QUERY: {query}",
+            truncate = true,
+            options = requestOptions,
+            keep_alive = "30m"
+        };
+
+        string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
+
+        var jsonContent = new StringContent(
+            jsonRequest,
+            Encoding.UTF8,
+            mediaType);
+
+        // Send POST request to the Ollama API
+        HttpResponseMessage response = await client.PostAsync("api/embed", jsonContent);
+
+        if (response.IsSuccessStatusCode)
+        {
+            // Read the response object
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            if(jsonResponse == null)
+                return null;
+            
+            var jsonObject = JsonSerializer.Deserialize<OllamaEmbedResponse>(jsonResponse, jsonOptions);
+
+            // Return the answer from the json object
+            if (jsonObject!.embeddings != null)
+                return jsonObject.embeddings;
+            else
+                return null;
+        }
+        else
+        {
+            throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+        }
+    }
+
+    /// <summary>
+    /// Store embedding in ClickHouse database
+    /// </summary>
+    /// <params name="question">The user question</params>
+    /// <params name="query">The SQL query</params>
+    /// <params name="embedding">The embedding of the question and query</params>
+    /// <returns>True if the embedding was stored successfully</returns>
+    public async Task<bool> StoreEmbedding(string question, string database, string table, string query, List<List<float>> embedding)
+    {
+        // convert embedding to string
+        string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
+
+        // escape single quotes in the strings
+        question = question.Replace("'", "''");
+        query = query.Replace("'", "''");
+
+        try
+        {
+            // insert embedding into ClickSphere.Embeddings table
+            string sql = "INSERT INTO ClickSphere.Embeddings " +
+                         "(Question, Database, Table, SQL_Query, Embedding_Question) " +
+                        $"VALUES ('{question}', '{database}', '{table}', '{query}', '[{embeddingString}]')";
+            await DbService!.ExecuteNonQuery(sql);
+        }
+        catch (Exception e)
+        {
+            throw new Exception($"Error storing embedding: {e.Message}");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Query the database for the most similar embeddings for a given question.
+    /// Generate an embedding for the question and compare it to the embeddings in the database.
+    /// </summary>
+    /// <param name="question">The user question</param>
+    /// <param name="database">The database to query</param>
+    /// <param name="table">The table to query</param>
+    /// <returns>List of SQL queries with the most similar embeddings</returns>
+    public async Task<IList<string>> GetSimilarQueries(string question, string database, string table)
+    {
+        // generate embedding for the question
+        var embedding = await GenerateEmbedding(question, "");
+
+        if (embedding == null)
+            return [];
+
+        // convert embedding to string
+        string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
+
+        // get the most similar embeddings from the database
+        string sql = $"SELECT SQL_Query, cosineDistance(Embedding_Question, '[{embeddingString}]') as Distance " +
+                      "FROM ClickSphere.Embeddings " + 
+                     $"WHERE cosineDistance(Embedding_Question, '[{embeddingString}]') > 0.5 " +
+                     $"AND Database = '{database}' AND Table = '{table}' AND isNotNull(Embedding_Question) " +
+                     $"ORDER BY 2 DESC";
+        var result = await DbService!.ExecuteQueryDictionary(sql);
+
+        return result.Select(x => x["SQL_Query"]?.ToString() ?? "").ToList();
     }
 }

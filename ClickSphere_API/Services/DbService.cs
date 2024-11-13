@@ -1,4 +1,7 @@
+using System.Configuration;
 using System.Reflection;
+using ClickSphere_API.Models;
+using Microsoft.AspNetCore.SignalR;
 using Octonica.ClickHouseClient;
 namespace ClickSphere_API.Services;
 
@@ -11,6 +14,11 @@ public class DbService : IDbService
     private readonly ClickHouseConnectionStringBuilder? _connString;
     private string Host { get; set; }
     private ushort Port { get; set; }
+    private readonly string ODBC_DSN;
+    private readonly string ODBC_User;
+    private readonly string ODBC_Password;
+    private readonly string ODBC_Database;
+    private static bool _initialized = false;
 
     /// <summary>
     /// Constructor for the DbService class
@@ -32,6 +40,11 @@ public class DbService : IDbService
         if (configuration["ClickHouse:User"] == null)
             throw new ArgumentNullException(nameof(configuration), "ClickHouse:User");
 
+        ODBC_DSN = configuration["ODBC:DSN"] ?? "";
+        ODBC_User = configuration["ODBC:User"] ?? "";
+        ODBC_Password = configuration["ODBC:Password"] ?? "";
+        ODBC_Database = configuration["ODBC:Database"] ?? "";
+
         _connString = new ClickHouseConnectionStringBuilder
         {
             Host = Host,
@@ -43,11 +56,17 @@ public class DbService : IDbService
 
         try
         {
-            InitializeDatabase().Wait();
+            // do not execute if executed before
+            if (!_initialized)
+                InitializeDatabase().Wait();
         }
-        catch(Exception)
+        catch (Exception)
         {
             throw new Exception("Database server is not accessible! Please check, if it is running.\n");
+        }
+        finally
+        {
+            _initialized = true;
         }
     }
 
@@ -237,21 +256,21 @@ public class DbService : IDbService
         query = "SELECT Value FROM ClickSphere.Config WHERE Key = 'Version' and Section = 'ClickSphere'";
         object? result = await ExecuteScalar(query);
 
-        if(result is DBNull)
+        // create role 'Admin'
+        query = "CREATE ROLE IF NOT EXISTS Admin";
+        await ExecuteNonQuery(query);
+
+        if (result is DBNull)
         {
             query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('Version', '{version}', 'ClickSphere')";
             await ExecuteNonQuery(query);
         }
         else
         {
-            if(result != null && result.ToString() != version)
+            if (result != null && result.ToString() != version)
             {
-                query = $"UPDATE ClickSphere.Config SET Value = '{version}' WHERE Key = 'Version' and Section = 'ClickSphere'";
+                query = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{version}' WHERE Key = 'Version' AND Section = 'ClickSphere'";
                 await ExecuteNonQuery(query);
-            }
-            else
-            {
-                return;
             }
         }
 
@@ -276,10 +295,13 @@ public class DbService : IDbService
             }
         }
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = MergeTree() PRIMARY KEY(Id)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String, Questions String) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
+        await ExecuteNonQuery(query);
+
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Embeddings (Id UUID, Question String, Database String, Table String, SQL_Query String, Embedding_Question Array(Float32)) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
         // check if AI Configuration exists
@@ -297,14 +319,14 @@ public class DbService : IDbService
     /// </summary>
     private async Task InsertAiConfig()
     {
-       // insert AI Configuration
+        // insert AI Configuration
         string query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaUrl', 'http://localhost:11434', 'AiConfig')";
         await ExecuteNonQuery(query);
 
         query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaModel', 'codegemma', 'AiConfig')";
         await ExecuteNonQuery(query);
 
-        string systemPrompt = 
+        string systemPrompt =
 """
 # IDENTITY and PURPOSE
 
@@ -345,7 +367,7 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         systemPrompt = systemPrompt.Replace("\n", "\\n").Replace("'", "''");
 
         query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('SystemPrompt', '{systemPrompt}', 'AiConfig')";
-            await ExecuteNonQuery(query);
+        await ExecuteNonQuery(query);
     }
 
     /// <summary>
@@ -355,5 +377,35 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     {
         string query = "DROP DATABASE IF EXISTS ClickSphere";
         await ExecuteNonQuery(query);
+    }
+
+    /// <summary>
+    /// Get column as list from ODBC table
+    /// </summary>
+    /// <param name="table">The table name</param>
+    /// <param name="columnName">The column name</param>
+    /// <returns>List of strings</returns>
+    public async Task<IList<string>> GetColumnFromODBC(string table, string columnName)
+    {
+        string query =
+            $"select {columnName} " +
+            $"from odbc('DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};', '', '{table}');";
+
+        return await ExecuteQuery(query);
+    }
+
+    /// <summary>
+    /// Get scalar value from ODBC table
+    /// </summary>
+    /// <param name="table">The table name</param>
+    /// <param name="columnName">The column name</param>
+    /// <returns>The scalar value</returns>
+    public async Task<object?> GetScalarFromODBC(string table, string columnName)
+    {
+        string query =
+            $"select {columnName} " +
+            $"from odbc('DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};', '', '{table}');";
+
+        return await ExecuteScalar(query);
     }
 }

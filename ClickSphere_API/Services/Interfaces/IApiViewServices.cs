@@ -81,4 +81,13 @@ public interface IApiViewService
     /// <param name="columnName">The column name.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task<IList<string>> GetDistinctValues(string database, string viewId, string columnName);
+
+
+    /// <summary>
+    /// Import view from ODBC into ClickHouse
+    /// </summary>
+    /// <param name="view">The view name</param>
+    /// <param name="dropExisting">Whether to drop the existing view</param>
+    /// <returns></returns>
+    Task<string> ImportViewFromODBC(string view, bool dropExisting);
 }

@@ -41,26 +41,13 @@ public class AiController(IAiService AiService) : ControllerBase
             return "Invalid request";
         }
 
-        // Call the Ollama API
-        string response = await AiService.GenerateQuery(request.Question, request.Database, request.Table);        
-        return response;
-    }
-
-    /// <summary>
-    /// Generate a SQL query and execute it on the specified database.
-    /// </summary>
-    /// <param name="question" example="Calculate the average traveling time (in minutes) for all trips with a pickup date between 2015-01-01 and 2015-12-31.">The question to ask.</param>
-    /// <param name="database" example="default">The database to execute the query on.</param>
-    /// <param name="table" example="trips">The table to ask the question about.</param>
-    /// <returns>The result of the query execution.</returns>
-    [Authorize]
-    [Route("/generateAndExecuteQuery")]
-    [HttpPost]
-    public async Task<string> GenerateAndExecuteQuery(string question, string database, string table)
-    {
-        // Call the Ollama API
-        string response = await AiService.GenerateAndExecuteQuery(question, database, table);
-        return response;
+        // Get similar queries from embeddings
+        var queries = await AiService.GetSimilarQueries(request.Question, request.Database, request.Table);
+        if(queries.Count > 0)
+            return queries[0];
+        
+        // Call the Ollama API to get response
+        return await AiService.GenerateQuery(request.Question, request.Database, request.Table);
     }
 
     /// <summary>
