@@ -77,8 +77,7 @@ public class AiController(IAiService AiService) : ControllerBase
     public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
     {
         // Call the Ollama API
-        IDictionary<string, string> response = await AiService.GetColumnDescriptions(database, table);
-        return response;
+        return await AiService.GetColumnDescriptions(database, table);
     }
 
     /// <summary>

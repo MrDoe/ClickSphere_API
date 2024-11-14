@@ -364,6 +364,9 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         // convert from MS SQL to ClickHouse data types
         foreach (var column in columns)
         {
+            // // convert umlauts
+            // column["COLUMN_NAME"] = column["COLUMN_NAME"].ToString()!.Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
+
             string dataType = column["DATA_TYPE"].ToString() ?? "String";
             string chDataType = dataType switch
             {
@@ -426,7 +429,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         // build create table statement
         foreach (var column in columns)
         {
-            query += $"{column["COLUMN_NAME"]} {column["DATA_TYPE"]} ";
+            query += $"`{column["COLUMN_NAME"]}` {column["DATA_TYPE"]} ";
 
             if(column["IS_NULLABLE"].ToString() == "YES")
                 query += "NULL DEFAULT NULL";

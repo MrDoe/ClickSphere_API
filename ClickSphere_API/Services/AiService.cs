@@ -28,7 +28,7 @@ public partial class AiService : IAiService
     public void SetAiConfig()
     {
         AiConfig = GetAiConfig();
-        if(string.IsNullOrEmpty(AiConfig.OllamaUrl) || string.IsNullOrEmpty(AiConfig.OllamaModel))
+        if (string.IsNullOrEmpty(AiConfig.OllamaUrl) || string.IsNullOrEmpty(AiConfig.OllamaModel))
         {
             throw new Exception("Error: Ollama URL or model not set in the configuration!");
         }
@@ -53,7 +53,7 @@ public partial class AiService : IAiService
     /// <param name="question"></param>
     /// <returns></returns>
     public async Task<string> Ask(string question)
-    {        
+    {
         using HttpClientHandler handler = new()
         {
             UseProxy = false
@@ -142,8 +142,7 @@ public partial class AiService : IAiService
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0,
-            num_ctx = 8192
+            temperature = 0.0
         };
 
         var request = new OllamaRequest
@@ -189,9 +188,11 @@ public partial class AiService : IAiService
                 // get the query after the first SELECT until the first ';' character
                 int selectIndex = responseText.IndexOf("SELECT");
                 int semicolonIndex = responseText.IndexOf(';');
-                if(semicolonIndex == -1)
+                if (semicolonIndex == -1)
                 {
-                    semicolonIndex = responseText.Length - 1;
+                    // add semicolon to the end of the response
+                    responseText += ";";
+                    semicolonIndex = responseText.IndexOf(';');
                 }
 
                 if (selectIndex != -1)
@@ -226,7 +227,7 @@ public partial class AiService : IAiService
     public async Task<IList<string>> GetPossibleQuestions(string database, string table)
     {
         // get 20 random rows from the table
-        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} ORDER BY rand() LIMIT 20");
+        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} ORDER BY rand() LIMIT 10");
 
         // get source table definition from database
         string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
@@ -238,16 +239,14 @@ public partial class AiService : IAiService
         string systemPrompt = """
 # IDENTITY and PURPOSE
 
-You are an expert for data analysis and medicial data.
-You are able to generate a list of related questions for analyzing a given dataset.
-Take a look at the EXAMPLE DATASET given below.
+You are an expert for data analysis of medical and biosample data.
+Your task is to create a list of related questions for the EXAMPLE DATASET given by the user.
+Take TABLE SCHEMA as a reference for the columns of the EXAMPLE DATASET.
 Precisely follow the instructions given to you.
 
 # TABLE SCHEMA
 
 [_TABLE_SCHEMA_]
-
-# EXAMPLE DATASET
 
 """;
 
@@ -255,6 +254,9 @@ Precisely follow the instructions given to you.
 
         // create a prompt with the table rows
         StringBuilder prompt = new();
+
+        prompt.AppendLine("# EXAMPLE DATASET");
+        prompt.AppendLine();
 
         // generate column header
         var columnHeaders = rows.First().Keys;
@@ -269,20 +271,23 @@ Precisely follow the instructions given to you.
 
         foreach (var row in rows)
         {
-            if(row == rows.First())
+            if (row == rows.First())
                 continue;
-            
+
             foreach (var column in row)
             {
                 prompt.Append($"\"{column.Value}\",");
             }
             prompt.AppendLine();
         }
-        prompt.AppendLine("# TASKS");
-        prompt.AppendLine("Generate a list of 10 related questions for analyzing the EXAMPLE DATASET." + 
-                          "Only ask questions about columns of the EXAMPLE DATASET. No explanations. No numberings. No bullet lists. " + 
-                          "Don't ask questions where columns are needed which are not present in the EXAMPLE DATASET. " +
-                          "Output the questions only, separated by newline characters.");
+
+
+        prompt.AppendLine("# YOUR TASK:");
+        prompt.AppendLine();
+        prompt.AppendLine("Generate a list of 10 related questions for analyzing the EXAMPLE DATASET.\n" +
+                          "Only ask questions about existing columns of the EXAMPLE DATASET.\n" +
+                          "Don't ask questions for which to answer columns are needed that are not present in the EXAMPLE DATASET.\n" +
+                          "Output the questions only, separated by newline characters. No explanations. No numberings. No bullet lists.");
 
         using HttpClientHandler handler = new()
         {
@@ -302,16 +307,15 @@ Precisely follow the instructions given to you.
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0,
-            num_ctx = 8192
+            temperature = 0.1
         };
 
         var request = new OllamaRequest
         {
-            model = AiConfig.OllamaModel!,
+            model = "gemma2:9b-instruct-q5_K_M",
             system = systemPrompt,
             prompt = prompt.ToString(),
-            stream = false,
+            stream = false
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
@@ -328,9 +332,9 @@ Precisely follow the instructions given to you.
         {
             // Read the response object
             string jsonResponse = await response.Content.ReadAsStringAsync();
-            if(jsonResponse == null)
+            if (jsonResponse == null)
                 return ["ERROR: No response from Ollama API!"];
-            
+
             var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
 
             // Return the answer from the json object
@@ -357,56 +361,43 @@ Precisely follow the instructions given to you.
     }
 
     /// <summary>
-    /// Analyze the table and generate a list of column descriptions
+    /// Analyze the table and generate a list of column descriptions column by column
     /// </summary>
-    /// <param name="database">The database to get the table from</param>
     /// <param name="table">The table to get the rows from</param>
+    /// <param name="column">The column to get the description for</param>
+    /// <param name="datatype">The datatype of the column</param>
     /// <returns>Dictionary of column descriptions</returns>
-    public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
+    private async Task<string> GetColumnDescription(string table, string column, string datatype)
     {
         // get first 100 rows of the table
-        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+        //var rows = await DbService!.ExecuteQueryDictionary($"SELECT distinct(`{column}`) FROM {database}.{table} LIMIT 10");
 
         // add table definition to the system prompt
-        string systemPrompt = """
-# IDENTITY and PURPOSE
+        string systemPrompt =
+"""
+# Instructions:
 
-You are an expert for data analysis and medicial data.
-You are able to generate a list of descriptions for the columns of a given dataset.
-Take a look at the EXAMPLE DATASET given below.
-Be concise and precise.
+- You are an expert for biosample and medical data.
+- Be precise and concise and follow the instructions given to you.
+- Output the column description only, no bullet points or numbered lists.
+""";
 
-# EXAMPLE DATASET
+        string prompt = """
+# Instructions:
+
+Generate a description for a database column based on the following information:
+- Table Name: [TableName]
+- Column Name (DataType): [ColumnName] ([DataType])
+Output a short description only, no explanations. 
+
+# Output:
 
 """;
-        // create a prompt with the table rows
-        StringBuilder prompt = new();
 
-        // generate column header
-        var columnHeaders = rows.First().Keys;
-        foreach (var column in columnHeaders)
-        {
-            prompt.Append($"\"{column}\"");
-            if (column != columnHeaders.Last())
-                prompt.Append(',');
-        }
-
-        prompt.AppendLine();
-
-        foreach (var row in rows)
-        {
-            if(row == rows.First())
-                continue;
-            
-            foreach (var column in row)
-            {
-                prompt.Append($"\"{column.Value}\",");
-            }
-            prompt.AppendLine();
-        }
-        prompt.AppendLine("\n# TASKS\n\n" + 
-                          "For every column in the EXAMPLE DATASET find an appropriate description.\n" + 
-                          "Output in the format: '[COLUMN1_NAME],[DESCRIPTION_1],\n[COLUMN2_NAME],[DESCRIPTION_2],\n...");
+        // insert table and column name into the prompt
+        prompt = prompt.Replace("[TableName]", table);
+        prompt = prompt.Replace("[ColumnName]", column);
+        prompt = prompt.Replace("[DataType]", datatype);
 
         using HttpClientHandler handler = new()
         {
@@ -427,15 +418,15 @@ Be concise and precise.
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0
+            temperature = 0.1
         };
 
         var request = new OllamaRequest
         {
-            model = AiConfig.OllamaModel!,
+            model = "gemma2:9b-instruct-q5_K_M",
             system = systemPrompt,
-            prompt = prompt.ToString(),
-            stream = false,
+            prompt = prompt,
+            stream = false
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
@@ -452,37 +443,45 @@ Be concise and precise.
         {
             // Read the response object
             string jsonResponse = await response.Content.ReadAsStringAsync();
-            if(jsonResponse == null)
-                return new Dictionary<string, string>() { { "ERROR", "No response from Ollama API!" } };
-            
+            if (jsonResponse == null)
+                return "";
+
             var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
 
             // Return the answer from the json object
             if (jsonObject!.response != null)
             {
-                string responseText = jsonObject.response.Trim();
-
-                // build dictionary from response ("column1,description1\n...")
-                var columnDescriptions = new Dictionary<string, string>();
-                var lines = responseText.Split('\n').Select(x => x.Trim()).ToList();
-                foreach (var line in lines)
-                {
-                    var parts = line.Split(',');
-                    if (parts.Length == 2)
-                    {
-                        columnDescriptions.Add(parts[0].Trim(), parts[1].Trim());
-                    }
-                }
-
-                return columnDescriptions;
+                return jsonObject.response.Trim();
             }
-            return new Dictionary<string, string>() { { "ERROR", "Unsuccessful generation of column descriptions!" } };
+            return "";
         }
         else
         {
             throw new Exception($"Error calling Ollama API: {response.StatusCode}");
         }
     }
+
+/// <summary>
+/// Generate column descriptions for the specified table.
+/// </summary>
+/// <param name="database" example="default">The name of the database.</param>
+/// <param name="table" example="trips">The name of the table.</param>
+/// <returns>The dictionary of column descriptions.</returns>
+public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
+{
+    // get column names first
+    var columns = await ViewService!.GetViewColumns(database, table, false);
+
+    // iterate over columns and get descriptions
+    var columnDescriptions = new Dictionary<string, string>();
+    foreach (var column in columns)
+    {
+        var description = await GetColumnDescription(table, column.ColumnName!, column.DataType!);
+        columnDescriptions.Add(column.ColumnName!, description);
+    }
+
+    return columnDescriptions;
+}
 
     /// <summary>
     /// Get the system configuration
@@ -497,8 +496,8 @@ Be concise and precise.
 
         if (result.Count == 0)
             return config;
-        
-        foreach(var row in result)
+
+        foreach (var row in result)
         {
             if (row.ContainsKey("Key") && row.ContainsKey("Value"))
             {
@@ -597,9 +596,9 @@ Be concise and precise.
         {
             // Read the response object
             string jsonResponse = await response.Content.ReadAsStringAsync();
-            if(jsonResponse == null)
+            if (jsonResponse == null)
                 return null;
-            
+
             var jsonObject = JsonSerializer.Deserialize<OllamaEmbedResponse>(jsonResponse, jsonOptions);
 
             // Return the answer from the json object
@@ -666,9 +665,9 @@ Be concise and precise.
         string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
 
         // get the most similar embeddings from the database
-        string sql = $"SELECT SQL_Query, cosineDistance(Embedding_Question, '[{embeddingString}]') as Distance " +
-                      "FROM ClickSphere.Embeddings " + 
-                     $"WHERE cosineDistance(Embedding_Question, '[{embeddingString}]') > 0.5 " +
+        string sql = $"SELECT SQL_Query, cosineDistance(Embedding_Question, [{embeddingString}]) as Distance " +
+                      "FROM ClickSphere.Embeddings " +
+                     $"WHERE cosineDistance(Embedding_Question, [{embeddingString}]) > 0.5 " +
                      $"AND Database = '{database}' AND Table = '{table}' AND isNotNull(Embedding_Question) " +
                      $"ORDER BY 2 DESC";
         var result = await DbService!.ExecuteQueryDictionary(sql);
