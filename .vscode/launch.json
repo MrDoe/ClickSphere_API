@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/ClickSphere_API/bin/Debug/net8.0/ClickSphere_API.dll",
+            "program": "${workspaceFolder}/ClickSphere_API/bin/Debug/net9.0/ClickSphere_API.dll",
             "args": [],
             "cwd": "${workspaceFolder}/ClickSphere_API",
             "stopAtEntry": false,
