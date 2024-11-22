@@ -5,7 +5,8 @@ namespace ClickSphere_API.Services;
 /// <summary>
 /// Service class for handling view operations.
 /// </summary>
-/// <param name="dbService"></param>
+/// <param name="dbService">Database service</param>
+/// <param name="configuration">Configuration settings</param>
 public class ApiViewServices(IDbService dbService, IConfiguration configuration) : IApiViewService
 {
     private readonly IDbService _dbService = dbService;

@@ -18,4 +18,9 @@ public class GenerateQueryRequest
     /// The table/view to ask the question about.
     /// </summary>
     public string? Table { get; set; }
+
+    /// <summary>
+    /// Whether to use embeddings for the query generation.
+    /// </summary>
+    public bool UseEmbeddings { get; set; } = false;
 }

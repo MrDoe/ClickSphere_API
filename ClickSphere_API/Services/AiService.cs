@@ -1,9 +1,10 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using ClickSphere_API.Models.Requests;
 using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
+using ClickSphere_API.Models.Requests;
+using ClickSphere_API.Tools;
 
 namespace ClickSphere_API.Services;
 
@@ -15,29 +16,19 @@ public partial class AiService : IAiService
     /// <summary>
     /// Initializes a new instance of the <see cref="AiService"/> class.
     /// </summary>
-    public AiService(IDbService dbService, IApiViewService viewService)
+    public AiService(IDbService dbService, IApiViewService viewService, IRagService ragService)
     {
+        RagService = ragService;
         DbService = dbService;
         ViewService = viewService;
         AiConfig = GetAiConfig();
-    }
-
-    /// <summary>
-    /// Sets the AI configuration.
-    /// </summary>
-    public void SetAiConfig()
-    {
-        AiConfig = GetAiConfig();
-        if (string.IsNullOrEmpty(AiConfig.OllamaUrl) || string.IsNullOrEmpty(AiConfig.OllamaModel))
-        {
-            throw new Exception("Error: Ollama URL or model not set in the configuration!");
-        }
     }
 
     private IDbService? DbService { get; set; }
     private IApiViewService? ViewService { get; set; }
     private readonly string OllamaApiPath = "api/generate";
     private AiConfig AiConfig { get; set; }
+    private IRagService RagService { get; set; }
     private readonly string promptAddition = " Keep it short and as simple as possible.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
@@ -109,8 +100,9 @@ public partial class AiService : IAiService
     /// <param name="question">The question to convert into a SQL query</param>
     /// <param name="database">The database the query will run on.</param>
     /// <param name="table">The table the query will run on.</param>
+    /// <param name="useEmbeddings">Whether to use embeddings for the question and query</param>
     /// <returns></returns>
-    public async Task<string> GenerateQuery(string question, string database, string table)
+    public async Task<string> GenerateQuery(string question, string database, string table, bool useEmbeddings)
     {
         // get source table definition from database
         string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
@@ -200,14 +192,16 @@ public partial class AiService : IAiService
                     responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
 
-                // generate embedding for question and query
-                var embedding = await GenerateEmbedding(question, responseText);
-                if (embedding != null)
+                if(useEmbeddings)
                 {
-                    // store embedding in ClickHouse database
-                    await StoreEmbedding(question, database, table, responseText, embedding);
+                    // generate embedding for question and query
+                    var embedding = await RagService.GenerateEmbedding($"QUESTION: {question}\n\nSQL_QUERY: {responseText}");
+                    if (embedding != null)
+                    {
+                        // store embedding in ClickHouse database
+                        await RagService.StoreSqlEmbedding(question, database, table, responseText, embedding);
+                    }
                 }
-
                 return responseText;
             }
             return jsonObject.response ?? "Unsuccessful query generation!";
@@ -461,27 +455,27 @@ Output a short description only, no explanations.
         }
     }
 
-/// <summary>
-/// Generate column descriptions for the specified table.
-/// </summary>
-/// <param name="database" example="default">The name of the database.</param>
-/// <param name="table" example="trips">The name of the table.</param>
-/// <returns>The dictionary of column descriptions.</returns>
-public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
-{
-    // get column names first
-    var columns = await ViewService!.GetViewColumns(database, table, false);
-
-    // iterate over columns and get descriptions
-    var columnDescriptions = new Dictionary<string, string>();
-    foreach (var column in columns)
+    /// <summary>
+    /// Generate column descriptions for the specified table.
+    /// </summary>
+    /// <param name="database" example="default">The name of the database.</param>
+    /// <param name="table" example="trips">The name of the table.</param>
+    /// <returns>The dictionary of column descriptions.</returns>
+    public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
     {
-        var description = await GetColumnDescription(table, column.ColumnName!, column.DataType!);
-        columnDescriptions.Add(column.ColumnName!, description);
-    }
+        // get column names first
+        var columns = await ViewService!.GetViewColumns(database, table, false);
 
-    return columnDescriptions;
-}
+        // iterate over columns and get descriptions
+        var columnDescriptions = new Dictionary<string, string>();
+        foreach (var column in columns)
+        {
+            var description = await GetColumnDescription(table, column.ColumnName!, column.DataType!);
+            columnDescriptions.Add(column.ColumnName!, description);
+        }
+
+        return columnDescriptions;
+    }
 
     /// <summary>
     /// Get the system configuration
@@ -544,12 +538,171 @@ public async Task<IDictionary<string, string>> GetColumnDescriptions(string data
     }
 
     /// <summary>
-    /// Generate embedding from user question and SQL query
+    /// Get models from the Ollama API.
     /// </summary>
-    /// <param name="question">The user question</param>
-    /// <param name="query">The SQL query</param>
-    /// <returns>Embedding of the question and query</returns>
-    public async Task<List<List<float>>?> GenerateEmbedding(string question, string query)
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    public IList<string> GetModels(CancellationToken token = default)
+    {
+        return GetModelsAsync(token).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Get models from the Ollama API.
+    /// </summary>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    public async Task<IList<string>> GetModelsAsync(CancellationToken token = default)
+    {
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+        List<string> models = [];
+        HttpResponseMessage? response = null;
+        try
+        {
+            response = await client.GetAsync(
+                "api/tags",
+                token).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+        if (response != null && response.IsSuccessStatusCode)
+        {
+            using var stream = await response.Content.ReadAsStreamAsync(token);
+            using var reader = new StreamReader(stream);
+            string? output = await reader.ReadToEndAsync(token);
+
+            if (output != null)
+            {
+                // only collect model names
+                var deserializedModels = JsonSerializer.Deserialize<OllamaModelRequest>(output)?.models;
+
+                if (deserializedModels != null)
+                {
+                    foreach (var model in deserializedModels)
+                    {
+                        models.Add(model!.name!);
+                    }
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine($"Request failed with status: {response?.StatusCode}.");
+        }
+
+        return models;
+    }
+
+    /// <summary>
+    /// Pulls a new model from the Ollama API.
+    /// </summary>
+    /// <param name="modelName">The name of the model to pull.</param>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    public async Task<Result> PullModelAsync(string modelName, CancellationToken token = default)
+    {
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+        HttpResponseMessage? response;
+        try
+        {
+            var requestBody = new
+            {
+                name = modelName,
+                insecure = false,
+                stream = true
+            };
+
+            response = await client.PostAsync(
+                "api/pull",
+                new StringContent(JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json"),
+                token).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                using var streamContent = await response.Content.ReadAsStreamAsync(token);
+                using var reader = new StreamReader(streamContent);
+
+                string? line;
+                DateTime lastNotificationTime = DateTime.MinValue;
+                while ((line = await reader.ReadLineAsync(token)) != null && !token.IsCancellationRequested)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        var statusUpdate = JsonSerializer.Deserialize<Dictionary<string, object>?>(line);
+                        if (statusUpdate == null)
+                            continue;
+
+                        string statusMessage = statusUpdate["status"]?.ToString() ?? "Model pull in progress";
+
+                        if (statusUpdate.TryGetValue("completed", out object? completed) &&
+                           statusUpdate.TryGetValue("total", out object? total))
+                        {
+                            statusMessage += $" ({completed}/{total})";
+                        }
+
+                        // Check if 5 seconds have passed since the last notification
+                        if ((DateTime.Now - lastNotificationTime).TotalSeconds >= 5)
+                        {
+                            Console.WriteLine(statusMessage);
+                            lastNotificationTime = DateTime.Now;
+                        }
+
+                        if (statusUpdate!.ContainsKey("completed") == true)
+                        {
+                            if (statusUpdate["completed"]?.ToString() == statusUpdate["total"]?.ToString())
+                            {
+                                break;
+                            }
+                        }
+
+                        // handle errors
+                        if (statusUpdate!.ContainsKey("error"))
+                        {
+                            return new Result(false, "Model pull failed. Error: " + statusUpdate["error"]);
+                        }
+                    }
+                }
+                return new Result(true, "Model pull completed.");
+            }
+            else
+            {
+                return new Result(false, "Model pull failed with status: " + response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            return new Result(false, "Model pull failed. Error: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Deletes a model from Ollama.
+    /// </summary>
+    /// <param name="modelName">The name of the model to delete.</param>
+    /// <returns>The result of the operation.</returns>
+    public async Task<Result> DeleteModelAsync(string modelName)
     {
         // create a new HttpClient and HttpClientHandler
         using HttpClientHandler handler = new()
@@ -559,119 +712,35 @@ public async Task<IDictionary<string, string>> GetColumnDescriptions(string data
         using HttpClient client = new(handler)
         {
             BaseAddress = new Uri(AiConfig.OllamaUrl!),
-            Timeout = TimeSpan.FromSeconds(60)
+            Timeout = TimeSpan.FromSeconds(15)
         };
 
-        // Add an Accept header for JSON format
-        client.DefaultRequestHeaders.Accept.Clear();
-        var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
-        client.DefaultRequestHeaders.Accept.Add(mediaType);
-
-        // Create the JSON string for the request
-        var requestOptions = new OllamaRequestOptions
-        {
-            temperature = 0.0
-        };
-
-        var request = new OllamaEmbed
-        {
-            model = "nomic-embed-text",
-            input = $"QUESTION: {question}\nSQL_QUERY: {query}",
-            truncate = true,
-            options = requestOptions,
-            keep_alive = "30m"
-        };
-
-        string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
-
-        var jsonContent = new StringContent(
-            jsonRequest,
-            Encoding.UTF8,
-            mediaType);
-
-        // Send POST request to the Ollama API
-        HttpResponseMessage response = await client.PostAsync("api/embed", jsonContent);
-
-        if (response.IsSuccessStatusCode)
-        {
-            // Read the response object
-            string jsonResponse = await response.Content.ReadAsStringAsync();
-            if (jsonResponse == null)
-                return null;
-
-            var jsonObject = JsonSerializer.Deserialize<OllamaEmbedResponse>(jsonResponse, jsonOptions);
-
-            // Return the answer from the json object
-            if (jsonObject!.embeddings != null)
-                return jsonObject.embeddings;
-            else
-                return null;
-        }
-        else
-        {
-            throw new Exception($"Error calling Ollama API: {response.StatusCode}");
-        }
-    }
-
-    /// <summary>
-    /// Store embedding in ClickHouse database
-    /// </summary>
-    /// <params name="question">The user question</params>
-    /// <params name="query">The SQL query</params>
-    /// <params name="embedding">The embedding of the question and query</params>
-    /// <returns>True if the embedding was stored successfully</returns>
-    public async Task<bool> StoreEmbedding(string question, string database, string table, string query, List<List<float>> embedding)
-    {
-        // convert embedding to string
-        string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
-
-        // escape single quotes in the strings
-        question = question.Replace("'", "''");
-        query = query.Replace("'", "''");
-
+        // Send a POST request to the Ollama API
+        HttpResponseMessage? response;
         try
         {
-            // insert embedding into ClickSphere.Embeddings table
-            string sql = "INSERT INTO ClickSphere.Embeddings " +
-                         "(Question, Database, Table, SQL_Query, Embedding_Question) " +
-                        $"VALUES ('{question}', '{database}', '{table}', '{query}', '[{embeddingString}]')";
-            await DbService!.ExecuteNonQuery(sql);
+            var requestBody = new
+            {
+                name = modelName
+            };
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/delete")
+            {
+                Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
+            };
+            response = await client.SendAsync(request, CancellationToken.None).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return new Result(true, "Model deleted successfully.");
+            }
+            else
+            {
+                return new Result(false, "Model deletion failed with status: " + response.StatusCode);
+            }
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            throw new Exception($"Error storing embedding: {e.Message}");
+            return new Result(false, "Model deletion failed. Error: " + ex.Message);
         }
-
-        return true;
-    }
-
-    /// <summary>
-    /// Query the database for the most similar embeddings for a given question.
-    /// Generate an embedding for the question and compare it to the embeddings in the database.
-    /// </summary>
-    /// <param name="question">The user question</param>
-    /// <param name="database">The database to query</param>
-    /// <param name="table">The table to query</param>
-    /// <returns>List of SQL queries with the most similar embeddings</returns>
-    public async Task<IList<string>> GetSimilarQueries(string question, string database, string table)
-    {
-        // generate embedding for the question
-        var embedding = await GenerateEmbedding(question, "");
-
-        if (embedding == null)
-            return [];
-
-        // convert embedding to string
-        string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
-
-        // get the most similar embeddings from the database
-        string sql = $"SELECT SQL_Query, cosineDistance(Embedding_Question, [{embeddingString}]) as Distance " +
-                      "FROM ClickSphere.Embeddings " +
-                     $"WHERE cosineDistance(Embedding_Question, [{embeddingString}]) > 0.5 " +
-                     $"AND Database = '{database}' AND Table = '{table}' AND isNotNull(Embedding_Question) " +
-                     $"ORDER BY 2 DESC";
-        var result = await DbService!.ExecuteQueryDictionary(sql);
-
-        return result.Select(x => x["SQL_Query"]?.ToString() ?? "").ToList();
     }
 }

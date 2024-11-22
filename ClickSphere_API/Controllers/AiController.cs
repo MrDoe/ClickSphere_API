@@ -3,13 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Models;
+using System.Text;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
 /// Interface to the Ollama AI service.
 /// </summary>
 [ApiController]
-public class AiController(IAiService AiService) : ControllerBase
+public class AiController(IAiService AiService, IRagService RagService) : ControllerBase
 {
     /// <summary>
     /// Ask the AI a question. Call the Ollama API
@@ -41,13 +42,16 @@ public class AiController(IAiService AiService) : ControllerBase
             return "Invalid request";
         }
 
-        // Get similar queries from embeddings
-        var queries = await AiService.GetSimilarQueries(request.Question, request.Database, request.Table);
-        if(queries.Count > 0)
-            return queries[0];
-        
+        if(request.UseEmbeddings)
+        {
+            // Get similar queries from embeddings
+            var queries = await RagService.GetSimilarQueries(request.Question, request.Database, request.Table);
+            if(queries.Count > 0)
+                return queries[0];
+        }
+
         // Call the Ollama API to get response
-        return await AiService.GenerateQuery(request.Question, request.Database, request.Table);
+        return await AiService.GenerateQuery(request.Question, request.Database, request.Table, request.UseEmbeddings);
     }
 
     /// <summary>
@@ -106,5 +110,47 @@ public class AiController(IAiService AiService) : ControllerBase
     {
         // Call the Ollama API
         await AiService.SetAiConfig(config);
+    }
+
+    /// <summary>
+    /// Store the embedding of a document in the RAG table.
+    /// </summary>
+    /// <param name="doc">The document to store the embedding.</param>
+    /// <returns>True if the embedding was stored successfully.</returns>
+    [Authorize]
+    [Route("/storeRagEmbedding")]
+    [HttpPost]
+    public async Task<bool> StoreRagEmbedding(Document doc)
+    {
+        if(doc == null || doc.Filename == null || doc.Content == null)
+        {
+            return false;
+        }
+        // Generate embedding for the document
+        string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
+        var embedding = await RagService.GenerateEmbedding($"Document: '{doc.Filename}' Content: '{content}'");
+        if(embedding == null)
+        {
+            return false;
+        }
+        // decode content from base64
+        if(string.IsNullOrEmpty(content))
+            return false;
+        else
+           return await RagService.StoreRagEmbedding(doc.Filename, content, embedding[0]);
+    }
+
+    /// <summary>
+    /// Get the document contents from the RAG table by a keyword by doing RAG search.
+    /// </summary>
+    /// <param name="keyword">The keyword to search for in the documents.</param>
+    /// <returns>The list documents.</returns>
+    [Authorize]
+    [Route("/getRagDocuments")]
+    [HttpGet]
+    public async Task<IList<string>> GetRagDocuments(string keyword)
+    {
+        // Call the Ollama API
+        return await RagService.GetRagDocuments(keyword);
     }
 }

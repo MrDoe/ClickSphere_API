@@ -20,8 +20,9 @@ public interface IAiService
     /// <param name="question">The question to generate the query for.</param>
     /// <param name="database">The name of the database.</param>
     /// <param name="table">The name of the table.</param>
+    /// <param name="useEmbeddings">Whether to use embeddings for the query generation.</param>
     /// <returns>The generated query.</returns>
-    Task<string> GenerateQuery(string question, string database, string table);
+    Task<string> GenerateQuery(string question, string database, string table, bool useEmbeddings);
 
     /// <summary>
     ///  Gets the possible questions that can be asked to the AI service based on the database and table provided.
@@ -51,13 +52,4 @@ public interface IAiService
     /// </summary>
     /// <returns>The AI configuration.</returns>
     AiConfig GetAiConfig();
-
-    /// <summary>
-    /// Gets the similar queries based on the question provided.
-    /// </summary>
-    /// <param name="question">The question to get similar queries for.</param>
-    /// <param name="database">The name of the database.</param>
-    /// <param name="table">The name of the table.</param>
-    /// <returns>The list of similar queries.</returns>
-    Task<IList<string>> GetSimilarQueries(string question, string database, string table);
 }
