@@ -6,38 +6,25 @@ namespace ClickSphere_API.Controllers;
 /// The base class for ODBC connections from ClickHouse to Microsoft SQL Server.
 /// </summary>
 [ApiController]
-public class OdbcController(IDbService dbService, IApiViewService viewService) : ControllerBase
+public class OdbcController(IApiViewService viewService) : ControllerBase
 {
-    private readonly IDbService _dbService = dbService;
     private readonly IApiViewService _viewService = viewService;
 
     /// <summary>
-    /// Get the version of the SQL Server.
+    /// Get columns from a view in the ODBC connection.
     /// </summary>
-    /// <returns>The version of the server.</returns>
-    [HttpGet]
-    [Route("/odbc/version")]
-    public async Task<string> GetVersion()
-    {
-        var version = await _dbService.ExecuteScalar("SELECT @@VERSION");
-        return $"SQL Server version: {version}";
-    }
-
-    /// <summary>
-    /// Get columns from a table in the ODBC connection.
-    /// </summary>
-    /// <param name="table">The table to get.</param>
+    /// <param name="view">The view to get.</param>
     /// <param name="column">The column to get.</param>
     /// <returns>The list of views.</returns>
     [HttpGet]
-    [Route("/odbc/views")]
-    public async Task<IList<string>> GetColumnFromODBC(string table, string column)
+    [Route("/odbc/columns")]
+    public async Task<IList<string>> GetColumnsFromODBC(string view, string column)
     {
-        if(string.IsNullOrEmpty(table) || string.IsNullOrEmpty(column))
+        if(string.IsNullOrEmpty(view) || string.IsNullOrEmpty(column))
         {
             return [];
         }
-        return await _dbService.GetColumnFromODBC(table, column);
+        return await _viewService.GetColumnsFromODBC(view, column);
     }
 
     /// <summary>
@@ -55,5 +42,16 @@ public class OdbcController(IDbService dbService, IApiViewService viewService) :
             return "Invalid request";
         }
         return await _viewService.ImportViewFromODBC(view, dropExisting);
+    }
+
+    /// <summary>
+    /// Get views from the ODBC connection.
+    /// </summary>
+    /// <returns>The list of views.</returns>
+    [HttpGet]
+    [Route("/odbc/views")]
+    public async Task<IList<string>> GetViewsFromODBC()
+    {
+        return await _viewService.GetViewsFromODBC();
     }
 }

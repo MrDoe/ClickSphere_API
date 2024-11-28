@@ -128,29 +128,37 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
         }
         // Generate embedding for the document
         string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
-        var embedding = await RagService.GenerateEmbedding($"Document: '{doc.Filename}' Content: '{content}'");
-        if(embedding == null)
+
+        // split document content into chunks of 512 characters
+        for(int i = 0; i < content.Length; i += 512)
         {
-            return false;
+            var chunk = content.Substring(i, Math.Min(512, content.Length - i));
+            var embedding = await RagService.GenerateEmbedding($"Document: '{doc.Filename}' Content: '{chunk}'", "search_document");
+            if(embedding == null)
+            {
+                return false;
+            }
+            // decode content from base64
+            if(string.IsNullOrEmpty(chunk))
+                return false;
+            else
+                await RagService.StoreRagEmbedding(doc.Filename, chunk, embedding[0]);
         }
-        // decode content from base64
-        if(string.IsNullOrEmpty(content))
-            return false;
-        else
-           return await RagService.StoreRagEmbedding(doc.Filename, content, embedding[0]);
+        return true;
     }
 
     /// <summary>
     /// Get the document contents from the RAG table by a keyword by doing RAG search.
     /// </summary>
     /// <param name="keyword">The keyword to search for in the documents.</param>
+    /// <param name="distance">The distance threshold for the search.</param>
     /// <returns>The list documents.</returns>
     [Authorize]
     [Route("/getRagDocuments")]
     [HttpGet]
-    public async Task<IList<string>> GetRagDocuments(string keyword)
+    public async Task<IList<string>> GetRagDocuments(string keyword, float distance)
     {
         // Call the Ollama API
-        return await RagService.GetRagDocuments(keyword);
+        return await RagService.GetRagDocuments(keyword, distance);
     }
 }

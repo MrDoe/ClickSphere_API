@@ -378,34 +378,4 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         string query = "DROP DATABASE IF EXISTS ClickSphere";
         await ExecuteNonQuery(query);
     }
-
-    /// <summary>
-    /// Get column as list from ODBC table
-    /// </summary>
-    /// <param name="table">The table name</param>
-    /// <param name="columnName">The column name</param>
-    /// <returns>List of strings</returns>
-    public async Task<IList<string>> GetColumnFromODBC(string table, string columnName)
-    {
-        string query =
-            $"select {columnName} " +
-            $"from odbc('DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};', '', '{table}');";
-
-        return await ExecuteQuery(query);
-    }
-
-    /// <summary>
-    /// Get scalar value from ODBC table
-    /// </summary>
-    /// <param name="table">The table name</param>
-    /// <param name="columnName">The column name</param>
-    /// <returns>The scalar value</returns>
-    public async Task<object?> GetScalarFromODBC(string table, string columnName)
-    {
-        string query =
-            $"select {columnName} " +
-            $"from odbc('DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};', '', '{table}');";
-
-        return await ExecuteScalar(query);
-    }
 }

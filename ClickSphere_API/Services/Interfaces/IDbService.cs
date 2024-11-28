@@ -55,12 +55,4 @@ public interface IDbService
     /// <param name="query">The query to execute.</param>
     /// <returns>A list of objects of type T.</returns>
     Task<List<T>> ExecuteQueryList<T>(string query) where T : class, new();
-
-    /// <summary>
-    /// Get column as list from ODBC table
-    /// </summary>
-    /// <param name="table">The table name</param>
-    /// <param name="columnName">The column name</param>
-    /// <returns>List of strings</returns>
-    Task<IList<string>> GetColumnFromODBC(string table, string columnName);
 }

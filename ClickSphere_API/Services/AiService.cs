@@ -195,7 +195,7 @@ public partial class AiService : IAiService
                 if(useEmbeddings)
                 {
                     // generate embedding for question and query
-                    var embedding = await RagService.GenerateEmbedding($"QUESTION: {question}\n\nSQL_QUERY: {responseText}");
+                    var embedding = await RagService.GenerateEmbedding($"{question}\n\nSQL_QUERY: {responseText}", "search_document");
                     if (embedding != null)
                     {
                         // store embedding in ClickHouse database

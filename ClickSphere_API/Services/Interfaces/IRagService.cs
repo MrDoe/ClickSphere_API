@@ -16,8 +16,9 @@ public interface IRagService
     /// Generate embedding from input text.
     /// </summary>
     /// <param name="input">The input as plain text</param>
+    /// <param name="taskType">The type of task (search_document, search_query, classification, clustering)</param>
     /// <returns>Embedding vector</returns>
-    Task<List<List<float>>?> GenerateEmbedding(string input);
+    Task<List<List<float>>?> GenerateEmbedding(string input, string taskType);
 
     /// <summary>
     /// Store embedding of SQL query in ClickHouse database.
@@ -50,6 +51,7 @@ public interface IRagService
     /// Get the document contents from the RAG table by a keyword by doing RAG search.
     /// </summary>
     /// <param name="keyword">The keyword to search for in the documents</param>
+    /// <param name="distance">The distance threshold for the search</param>
     /// <returns>List of embeddings of the documents</returns>
-    Task<IList<string>> GetRagDocuments(string keyword);
+    Task<IList<string>> GetRagDocuments(string keyword, float distance);
 }

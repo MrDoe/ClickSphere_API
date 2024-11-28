@@ -103,8 +103,9 @@ public class RagService : IRagService
     /// Generate embedding from input text.
     /// </summary>
     /// <param name="input">The input text</param>
+    /// <param name="taskType">The task type (search_query, search_document, clustering, classification)</param>
     /// <returns>Embedding vector</returns>
-    public async Task<List<List<float>>?> GenerateEmbedding(string input)
+    public async Task<List<List<float>>?> GenerateEmbedding(string input, string? taskType)
     {
         // create a new HttpClient and HttpClientHandler
         using HttpClientHandler handler = new()
@@ -124,13 +125,13 @@ public class RagService : IRagService
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0
+            temperature = 0.1
         };
 
         var request = new OllamaEmbed
         {
             model = "nomic-embed-text",
-            input = input,
+            input = taskType + ": " + input,
             truncate = true,
             options = requestOptions,
             keep_alive = "5m"
@@ -210,7 +211,7 @@ public class RagService : IRagService
     public async Task<IList<string>> GetSimilarQueries(string question, string database, string table)
     {
         // generate embedding for the question
-        var embedding = await GenerateEmbedding(question);
+        var embedding = await GenerateEmbedding(question, "search_query: ");
 
         if (embedding == null)
             return [];
@@ -219,9 +220,9 @@ public class RagService : IRagService
         string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
 
         // get the most similar embeddings from the database
-        string sql = $"SELECT SQL_Query, cosineDistance(Embedding_Question, [{embeddingString}]) as Distance " +
+        string sql = $"SELECT SQL_Query, L2Distance(Embedding_Question, [{embeddingString}]) as Distance " +
                       "FROM ClickSphere.Embeddings " +
-                     $"WHERE cosineDistance(Embedding_Question, [{embeddingString}]) < 0.2 " +
+                     $"WHERE L2Distance(Embedding_Question, [{embeddingString}]) < 2.0 " +
                      $"AND Database = '{database}' AND Table = '{table}' AND isNotNull(Embedding_Question) " +
                      $"ORDER BY 2 DESC";
         var result = await DbService!.ExecuteQueryDictionary(sql);
@@ -265,11 +266,12 @@ public class RagService : IRagService
     /// Get the document contents from the RAG table by a keyword by doing RAG search.
     /// </summary>
     /// <param name="keyword">The keyword to search for in the documents</param>
+    /// <param name="distance">The distance threshold for the search</param>
     /// <returns>List of embeddings of the documents</returns>
-    public async Task<IList<string>> GetRagDocuments(string keyword)
+    public async Task<IList<string>> GetRagDocuments(string keyword, float distance)
     {
         // generate embedding for the keyword
-        var embedding = await GenerateEmbedding(keyword);
+        var embedding = await GenerateEmbedding(keyword, "search_query");
 
         if (embedding == null)
             return [];
@@ -280,10 +282,11 @@ public class RagService : IRagService
         // get the most similar embeddings from the database
         string sql =  "SELECT FilePath, FileContent, Embedding " +
                       "FROM ClickSphere.RAG " +
-                     $"WHERE cosineDistance(Embedding, [{embeddingString}]) > -0.5 " +
-                     $"ORDER BY cosineDistance(Embedding, [{embeddingString}]) DESC";
+                     $"WHERE L2Distance(Embedding, [{embeddingString}]) < {distance} " +
+                     $"ORDER BY L2Distance(Embedding, [{embeddingString}]) DESC";
+
         var result = await DbService!.ExecuteQueryDictionary(sql);
 
-        return result.Select(x => x["FileContent"]?.ToString() ?? "").ToList();
+        return result.Select(x => x["FilePath"]?.ToString() + ": " + x["FileContent"] ?? "").ToList();
     }
 }

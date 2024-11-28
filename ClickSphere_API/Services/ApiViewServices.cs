@@ -365,9 +365,6 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         // convert from MS SQL to ClickHouse data types
         foreach (var column in columns)
         {
-            // // convert umlauts
-            // column["COLUMN_NAME"] = column["COLUMN_NAME"].ToString()!.Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
-
             string dataType = column["DATA_TYPE"].ToString() ?? "String";
             string chDataType = dataType switch
             {
@@ -410,9 +407,12 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             };
             
             // add length to data type
-            if (!string.IsNullOrEmpty(column["CHARACTER_MAXIMUM_LENGTH"].ToString()))
+            if (!string.IsNullOrEmpty(column["CHARACTER_MAXIMUM_LENGTH"].ToString()) && 
+                chDataType != "String" && chDataType != "UUID" && chDataType != "DateTime64")
+            {
                 chDataType += $"({column["CHARACTER_MAXIMUM_LENGTH"]})";
-            
+            }
+
             column["DATA_TYPE"] = chDataType;
         }
 
@@ -480,5 +480,30 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         });
         
         return "ok";
+    }
+
+    /// <summary>
+    /// Get column from ODBC view
+    /// </summary>
+    /// <param name="view">The view name</param>
+    /// <param name="columnName">The column name</param>
+    /// <returns>List of strings</returns>
+    public async Task<IList<string>> GetColumnsFromODBC(string view, string columnName)
+    {
+        string query =
+            $"select {columnName} " +
+            $"from odbc('DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};', '', '{view}');";
+
+        return await _dbService.ExecuteQuery(query);
+    }
+
+    /// <summary>
+    /// Get views from ODBC
+    /// </summary>
+    /// <returns>List of views available for import as strings</returns>
+    public async Task<IList<string>> GetViewsFromODBC()
+    {
+        string query = $"SELECT VIEW_NAME FROM odbc('DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};', '', 'VIEW_SETTINGS');";
+        return await _dbService.ExecuteQuery(query);
     }
 }
