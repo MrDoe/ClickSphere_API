@@ -4,7 +4,6 @@ using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Models;
 using System.Text;
-using ClickSphere_API.Models;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
