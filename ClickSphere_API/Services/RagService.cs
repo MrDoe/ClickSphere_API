@@ -211,7 +211,7 @@ public class RagService : IRagService
     public async Task<IList<string>> GetSimilarQueries(string question, string database, string table)
     {
         // generate embedding for the question
-        var embedding = await GenerateEmbedding(question, "search_query: ");
+        var embedding = await GenerateEmbedding(question, "search_query");
 
         if (embedding == null)
             return [];

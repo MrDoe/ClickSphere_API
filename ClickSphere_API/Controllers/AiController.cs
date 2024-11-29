@@ -37,16 +37,16 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
     [HttpPost]
     public async Task<string> GenerateQuery(GenerateQueryRequest request)
     {
-        if(request.Question == null || request.Database == null || request.Table == null)
+        if (request.Question == null || request.Database == null || request.Table == null)
         {
             return "Invalid request";
         }
 
-        if(request.UseEmbeddings)
+        if (request.UseEmbeddings)
         {
             // Get similar queries from embeddings
             var queries = await RagService.GetSimilarQueries(request.Question, request.Database, request.Table);
-            if(queries.Count > 0)
+            if (queries.Count > 0)
                 return queries[0];
         }
 
@@ -122,28 +122,24 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
     [HttpPost]
     public async Task<bool> StoreRagEmbedding(Document doc)
     {
-        if(doc == null || doc.Filename == null || doc.Content == null)
+        if (doc == null || doc.Filename == null || doc.Content == null)
         {
             return false;
         }
         // Generate embedding for the document
         string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
 
-        // split document content into chunks of 512 characters
-        for(int i = 0; i < content.Length; i += 512)
+        var embedding = await RagService.GenerateEmbedding(content, "search_document");
+        if (embedding == null)
         {
-            var chunk = content.Substring(i, Math.Min(512, content.Length - i));
-            var embedding = await RagService.GenerateEmbedding($"Document: '{doc.Filename}' Content: '{chunk}'", "search_document");
-            if(embedding == null)
-            {
-                return false;
-            }
-            // decode content from base64
-            if(string.IsNullOrEmpty(chunk))
-                return false;
-            else
-                await RagService.StoreRagEmbedding(doc.Filename, chunk, embedding[0]);
+            return false;
         }
+        // decode content from base64
+        if (string.IsNullOrEmpty(content))
+            return false;
+        else
+            await RagService.StoreRagEmbedding(doc.Filename, content, embedding[0]);
+
         return true;
     }
 
