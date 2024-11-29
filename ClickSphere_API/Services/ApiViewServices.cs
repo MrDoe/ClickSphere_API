@@ -222,8 +222,12 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
                 "DateTime" or "DateTime64(3)" => "DateTime",
                 _ => "TextBox",
             };
+
+            // escape single quotes from data type
+            string dataType = col["Data Type"].ToString()?.Replace("'", "''") ?? "";
+            
             string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter) " +
-                                 $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{col["Data Type"]}','{controlType}',{sorter});";
+                                 $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{dataType}','{controlType}',{sorter});";
 
             await _dbService.ExecuteNonQuery(insertQuery);
             ++sorter;
@@ -265,11 +269,18 @@ public class ApiViewServices(IDbService dbService) : IApiViewService
     /// <returns>The result of the column update</returns>
     public async Task<IResult> UpdateViewColumn(ViewColumns column)
     {
+        if(column == null)
+            return Results.BadRequest("Column is null");
+        
+        // escape single quotes
+        string placeholder = column.Placeholder.Replace("'", "''");
+        string description = column.Description.Replace("'", "''");
+
         string query = $"ALTER TABLE ClickSphere.ViewColumns " +
                        $"UPDATE ControlType = '{column.ControlType}', " +
-                       $"Placeholder = '{column.Placeholder}', " +
+                       $"Placeholder = '{placeholder}', " +
                        $"Sorter = {column.Sorter}, " +
-                       $"Description = '{column.Description}' " +
+                       $"Description = '{description}' " +
                        $"WHERE Id = '{column.Id}';";
 
         int result = await _dbService.ExecuteNonQuery(query);

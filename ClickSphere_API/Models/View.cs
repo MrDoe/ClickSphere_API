@@ -52,5 +52,6 @@ public class View
         Name = "";
         Database = "";
         Query = "";
+        Questions = "";
     }
 }

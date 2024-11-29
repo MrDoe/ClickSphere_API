@@ -11,8 +11,6 @@ namespace ClickSphere_API.Controllers
     [ApiController]
     public class DataController(IDbService dbService, ISqlParser sqlParser) : ControllerBase
     {
-        private readonly IDbService _dbService = dbService;
-
         /// <summary>
         /// Execute custom query with SQL string in base64 format.
         /// </summary>
@@ -30,7 +28,7 @@ namespace ClickSphere_API.Controllers
             }
             catch (Exception e)
             {
-                return [new Dictionary<string, object> { { "error", "Invalid base64 string\n" + e.Message  } }];
+                return [new Dictionary<string, object> { { "error", "Invalid base64 string\n" + e.Message } }];
             }
 
             // validate and sanitize the input
@@ -43,7 +41,7 @@ namespace ClickSphere_API.Controllers
             // execute the sanitized query
             try 
             {
-                return await _dbService.ExecuteQueryDictionary(parsedQuery.SanitizedQuery);
+                return await dbService.ExecuteQueryDictionary(parsedQuery.SanitizedQuery);
             }
             catch (Exception e)
             {

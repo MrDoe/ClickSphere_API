@@ -7,15 +7,15 @@ public class GenerateQueryRequest
     /// <summary>
     /// The question to convert into a query.
     /// </summary>
-    public string Question { get; set; }
+    public string? Question { get; set; }
 
     /// <summary>
     /// The database to execute the query on.
     /// </summary>
-    public string Database { get; set; }
+    public string? Database { get; set; }
 
     /// <summary>
     /// The table/view to ask the question about.
     /// </summary>
-    public string Table { get; set; }
+    public string? Table { get; set; }
 }
