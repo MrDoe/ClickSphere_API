@@ -28,8 +28,8 @@ jobs:
         git pull --recurse-submodules
         git submodule update --remote --recursive
     - name: Restore dependencies
-      run: /usr/share/dotnet restore .
+      run: /usr/share/dotnet/dotnet restore .
     - name: Build
-      run: dotnet build --no-restore
+      run: /usr/share/dotnet/dotnet build --no-restore
     - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: /usr/share/dotnet/dotnet test --no-build --verbosity normal
