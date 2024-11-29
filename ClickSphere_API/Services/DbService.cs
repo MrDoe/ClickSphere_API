@@ -249,7 +249,7 @@ public class DbService : IDbService
 
         string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
         await ExecuteNonQuery(query);
-
+        
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Config (Key String, Value String, Section String) ENGINE = MergeTree() PRIMARY KEY(Key, Section)";
         await ExecuteNonQuery(query);
 
@@ -299,7 +299,7 @@ public class DbService : IDbService
         await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
-        await ExecuteNonQuery(query);
+        await ExecuteNonQuery(query); 
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Embeddings (Id UUID, Question String, Database String, Table String, SQL_Query String, Embedding_Question Array(Float32)) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
