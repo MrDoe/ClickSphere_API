@@ -52,7 +52,7 @@ public partial class AiService : IAiService
         using HttpClient client = new(handler)
         {
             BaseAddress = new Uri(AiConfig.OllamaUrl!),
-            Timeout = TimeSpan.FromSeconds(60)
+            Timeout = TimeSpan.FromSeconds(120)
         };
 
         // Add an Accept header for JSON format.
@@ -60,14 +60,29 @@ public partial class AiService : IAiService
         var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
         client.DefaultRequestHeaders.Accept.Add(mediaType);
 
-        string systemPrompt = "You are an expert for ClickHouse database systems. Answer questions related to ClickHouse databases only.";
+        string systemPrompt =
+"""
+Follow the instructions precisly. 
+Don't explain. 
+Output the answer only.
+Do not include any file links or URLs.
+Output plain text only without any formatting.
+Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
+""";
+    
+        OllamaRequestOptions options = new()
+        {
+            temperature = 0.1,
+            num_ctx = 8192
+        };
 
         OllamaRequest request = new()
         {
-            model = AiConfig.OllamaModel!,
+            model = "gemma2:9b-instruct-q5_K_M",
             prompt = question,
             stream = false,
-            system = systemPrompt
+            system = systemPrompt,
+            options = options
         };
 
         // Create the JSON request content.

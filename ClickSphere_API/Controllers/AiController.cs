@@ -4,6 +4,7 @@ using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Models;
 using System.Text;
+using System.Linq;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
@@ -129,7 +130,7 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
         // Generate embedding for the document
         string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
 
-        var embedding = await RagService.GenerateEmbedding(content, "search_document");
+        var embedding = await RagService.GenerateEmbedding(content, "doc.Filename");
         if (embedding == null)
         {
             return false;
@@ -152,9 +153,31 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
     [Authorize]
     [Route("/getRagDocuments")]
     [HttpGet]
-    public async Task<IList<string>> GetRagDocuments(string keyword, float distance)
+    public async Task<string> GetRagDocuments(string keyword, float distance)
     {
-        // Call the Ollama API
-        return await RagService.GetRagDocuments(keyword, distance);
+        keyword = "Extract all relevant documents which may be important for answering this question: " + keyword;
+        IList<string> documents = await RagService.GetRagDocuments(keyword, distance);
+        if (documents.Count == 0)
+        {
+            return "No documents found";
+        }
+
+        // re-query the AI with the documents to get the function definitions, datatypes and descriptions only
+        string prompt = "Don't output URLs. Output no formatting, no markdown, no bullet points or lists. Extract function definition from this text, if possible: '";
+        IList<string> responses = [];
+        foreach(var doc in documents)
+        {
+            string docPrompt = prompt + doc + "' If not, output nothing.";
+            string response = await AiService.Ask(docPrompt);
+            response = response.Replace("\r", "").Replace("\n\n", "\n").Replace("`", "").Trim();
+            if(response != "")
+            {
+                // check for duplicates
+                if (!responses.Contains(response))
+                    responses.Add(response);
+            }
+        }
+        string output = string.Join("\n", responses);
+        return output;
     }
 }

@@ -125,12 +125,12 @@ public class RagService : IRagService
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.1
+            //temperature = 0.1 // keep default value
         };
 
         var request = new OllamaEmbed
         {
-            model = "nomic-embed-text",
+            model = "mxbai-embed-large",
             input = taskType + ": " + input,
             truncate = true,
             options = requestOptions,
@@ -211,7 +211,7 @@ public class RagService : IRagService
     public async Task<IList<string>> GetSimilarQueries(string question, string database, string table)
     {
         // generate embedding for the question
-        var embedding = await GenerateEmbedding(question, "search_query");
+        var embedding = await GenerateEmbedding(question, "Represent this sentence for searching relevant passages");
 
         if (embedding == null)
             return [];
@@ -246,6 +246,10 @@ public class RagService : IRagService
         filename = filename.Replace("'", "''");
         document = document.Replace("'", "''");
 
+        // escape %, _, and \ in the strings
+        filename = filename.Replace("%", "\\%").Replace("_", "\\_").Replace("\\", "\\\\");
+        document = document.Replace("%", "\\%").Replace("_", "\\_").Replace("\\", "\\\\");
+
         try
         {
             // insert embedding into ClickSphere.RAG table
@@ -271,7 +275,7 @@ public class RagService : IRagService
     public async Task<IList<string>> GetRagDocuments(string keyword, float distance)
     {
         // generate embedding for the keyword
-        var embedding = await GenerateEmbedding(keyword, "search_query");
+        var embedding = await GenerateEmbedding(keyword, "Represent this sentence for searching relevant passages");
 
         if (embedding == null)
             return [];
@@ -282,11 +286,12 @@ public class RagService : IRagService
         // get the most similar embeddings from the database
         string sql =  "SELECT FilePath, FileContent, Embedding " +
                       "FROM ClickSphere.RAG " +
-                     $"WHERE L2Distance(Embedding, [{embeddingString}]) < {distance} " +
-                     $"ORDER BY L2Distance(Embedding, [{embeddingString}]) DESC";
+                     $"WHERE cosineDistance(Embedding, [{embeddingString}]) < {distance} " +
+                     $"ORDER BY cosineDistance(Embedding, [{embeddingString}]) ASC LIMIT 20";
 
         var result = await DbService!.ExecuteQueryDictionary(sql);
 
-        return result.Select(x => x["FilePath"]?.ToString() + ": " + x["FileContent"] ?? "").ToList();
+        // trim the results to only the FileContent
+        return [.. result.Select(x => x["FileContent"].ToString()?.Trim('\n').Trim() ?? "")];
     }
 }
