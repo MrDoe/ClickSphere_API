@@ -38,6 +38,13 @@ public class View
     public string Query { get; set; }
     
     /// <summary>
+    /// Gets or sets the type of the view.
+    /// V for standard view, M for materialized view.
+    /// </summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; }
+
+    /// <summary>
     /// Gets or sets the example questions for the view.
     /// </summary>
     [JsonPropertyName("questions")]
@@ -53,5 +60,6 @@ public class View
         Database = "";
         Query = "";
         Questions = "";
+        Type = "V";
     }
 }

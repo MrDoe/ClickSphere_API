@@ -3,13 +3,15 @@ using Microsoft.AspNetCore.Authorization;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Models;
+using System.Text;
+using System.Linq;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
 /// Interface to the Ollama AI service.
 /// </summary>
 [ApiController]
-public class AiController(IAiService AiService) : ControllerBase
+public class AiController(IAiService AiService, IRagService RagService) : ControllerBase
 {
     /// <summary>
     /// Ask the AI a question. Call the Ollama API
@@ -36,31 +38,21 @@ public class AiController(IAiService AiService) : ControllerBase
     [HttpPost]
     public async Task<string> GenerateQuery(GenerateQueryRequest request)
     {
-        if(request.Question == null || request.Database == null || request.Table == null)
+        if (request.Question == null || request.Database == null || request.Table == null)
         {
             return "Invalid request";
         }
 
-        // Call the Ollama API
-        string response = await AiService.GenerateQuery(request.Question, request.Database, request.Table);        
-        return response;
-    }
+        if (request.UseEmbeddings)
+        {
+            // Get similar queries from embeddings
+            var queries = await RagService.GetSimilarQueries(request.Question, request.Database, request.Table);
+            if (queries.Count > 0)
+                return queries[0];
+        }
 
-    /// <summary>
-    /// Generate a SQL query and execute it on the specified database.
-    /// </summary>
-    /// <param name="question" example="Calculate the average traveling time (in minutes) for all trips with a pickup date between 2015-01-01 and 2015-12-31.">The question to ask.</param>
-    /// <param name="database" example="default">The database to execute the query on.</param>
-    /// <param name="table" example="trips">The table to ask the question about.</param>
-    /// <returns>The result of the query execution.</returns>
-    [Authorize]
-    [Route("/generateAndExecuteQuery")]
-    [HttpPost]
-    public async Task<string> GenerateAndExecuteQuery(string question, string database, string table)
-    {
-        // Call the Ollama API
-        string response = await AiService.GenerateAndExecuteQuery(question, database, table);
-        return response;
+        // Call the Ollama API to get response
+        return await AiService.GenerateQuery(request.Question, request.Database, request.Table, request.UseEmbeddings);
     }
 
     /// <summary>
@@ -90,8 +82,7 @@ public class AiController(IAiService AiService) : ControllerBase
     public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
     {
         // Call the Ollama API
-        IDictionary<string, string> response = await AiService.GetColumnDescriptions(database, table);
-        return response;
+        return await AiService.GetColumnDescriptions(database, table);
     }
 
     /// <summary>
@@ -120,5 +111,73 @@ public class AiController(IAiService AiService) : ControllerBase
     {
         // Call the Ollama API
         await AiService.SetAiConfig(config);
+    }
+
+    /// <summary>
+    /// Store the embedding of a document in the RAG table.
+    /// </summary>
+    /// <param name="doc">The document to store the embedding.</param>
+    /// <returns>True if the embedding was stored successfully.</returns>
+    [Authorize]
+    [Route("/storeRagEmbedding")]
+    [HttpPost]
+    public async Task<bool> StoreRagEmbedding(Document doc)
+    {
+        if (doc == null || doc.Filename == null || doc.Content == null)
+        {
+            return false;
+        }
+        // Generate embedding for the document
+        string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
+
+        var embedding = await RagService.GenerateEmbedding(content, "doc.Filename");
+        if (embedding == null)
+        {
+            return false;
+        }
+        // decode content from base64
+        if (string.IsNullOrEmpty(content))
+            return false;
+        else
+            await RagService.StoreRagEmbedding(doc.Filename, content, embedding[0]);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Get the document contents from the RAG table by a keyword by doing RAG search.
+    /// </summary>
+    /// <param name="keyword">The keyword to search for in the documents.</param>
+    /// <param name="distance">The distance threshold for the search.</param>
+    /// <returns>The list documents.</returns>
+    [Authorize]
+    [Route("/getRagDocuments")]
+    [HttpGet]
+    public async Task<string> GetRagDocuments(string keyword, float distance)
+    {
+        keyword = "Extract all relevant documents which may be important for answering this question: " + keyword;
+        IList<string> documents = await RagService.GetRagDocuments(keyword, distance);
+        if (documents.Count == 0)
+        {
+            return "No documents found";
+        }
+
+        // re-query the AI with the documents to get the function definitions, datatypes and descriptions only
+        string prompt = "Don't output URLs. Output no formatting, no markdown, no bullet points or lists. Extract function definition from this text, if possible: '";
+        IList<string> responses = [];
+        foreach(var doc in documents)
+        {
+            string docPrompt = prompt + doc + "' If not, output nothing.";
+            string response = await AiService.Ask(docPrompt);
+            response = response.Replace("\r", "").Replace("\n\n", "\n").Replace("`", "").Trim();
+            if(response != "")
+            {
+                // check for duplicates
+                if (!responses.Contains(response))
+                    responses.Add(response);
+            }
+        }
+        string output = string.Join("\n", responses);
+        return output;
     }
 }

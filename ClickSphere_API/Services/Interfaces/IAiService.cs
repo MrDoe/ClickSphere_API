@@ -20,17 +20,9 @@ public interface IAiService
     /// <param name="question">The question to generate the query for.</param>
     /// <param name="database">The name of the database.</param>
     /// <param name="table">The name of the table.</param>
+    /// <param name="useEmbeddings">Whether to use embeddings for the query generation.</param>
     /// <returns>The generated query.</returns>
-    Task<string> GenerateQuery(string question, string database, string table);
-
-    /// <summary>
-    /// Generates and executes a query based on the question, database, and table provided.
-    /// </summary>
-    /// <param name="question">The question to generate and execute the query for.</param>
-    /// <param name="database">The name of the database.</param>
-    /// <param name="table">The name of the table.</param>
-    /// <returns>The result of executing the query.</returns>
-    Task<string> GenerateAndExecuteQuery(string question, string database, string table);
+    Task<string> GenerateQuery(string question, string database, string table, bool useEmbeddings);
 
     /// <summary>
     ///  Gets the possible questions that can be asked to the AI service based on the database and table provided.

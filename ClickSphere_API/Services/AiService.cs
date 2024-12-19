@@ -1,61 +1,35 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using ClickSphere_API.Models.Requests;
 using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
-//using Microsoft.AspNetCore.Mvc.ViewEngines;
-//using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using ClickSphere_API.Models.Requests;
+using ClickSphere_API.Tools;
 
 namespace ClickSphere_API.Services;
 
 /// <summary>
 /// Ai service class to connect to Ollama
 /// </summary>
-public partial class AiService(IDbService dbService, IApiViewService viewService) : IAiService
+public partial class AiService : IAiService
 {
-    private readonly IDbService DbService = dbService;
-    private readonly IApiViewService? ViewService = viewService;
-    private readonly string OllamaUrl = "http://localhost:11434";
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AiService"/> class.
+    /// </summary>
+    public AiService(IDbService dbService, IApiViewService viewService, IRagService ragService)
+    {
+        RagService = ragService;
+        DbService = dbService;
+        ViewService = viewService;
+        AiConfig = GetAiConfig();
+    }
+
+    private IDbService? DbService { get; set; }
+    private IApiViewService? ViewService { get; set; }
     private readonly string OllamaApiPath = "api/generate";
-    private readonly string SystemPrompt = """
-# IDENTITY and PURPOSE
-
-Translate natural text in English or German to ClickHouse SQL queries (Text2SQL).
-Be an expert in ClickHouse SQL databases.
-Be an expert in clinical and medical data and terminology in German and English.
-Use ClickHouse SQL references, tutorials, and documentation to generate valid ClickHouse SQL queries.
-
-# STEPS
-
-- Analyze the given table schema and identify the necessary columns. Use column descriptions to understand the expected data.
-- Use only the columns provided in the table schema to generate the query.
-- Analyze the question and identify the specific ClickHouse SQL instructions and functions needed.
-- Use the ClickHouse SQL Reference to validate all possible ClickHouse SQL functions and data types.
-- Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
-- Ensure all functions and data types used in the query are valid ClickHouse SQL functions and data types.
-- Ensure the correct number of arguments and data types are used in functions.
-- Ensure all column names in the query match exactly as written in the table schema.
-- Write ClickHouse function names in camelCase format (e.g., toDate, toDateTime). Start function names with a lowercase letter.
-- Do not write any comments with dashes (--) in the query.
-- Translate diagnoses provided as text into the respective ICD-10 codes, if needed.
-- Split up diagnoses from the question into their respective words (e.g., 'lung cancer' -> '%lung%', '%cancer%').
-- Append 'If' (like countIf, sumIf, avgIf, etc.) to the function name if needed.
-
-# OUTPUT INSTRUCTIONS
-
-- Ask the user for clarification if the question is unclear or ambiguous.
-- Deny questions that require columns not present or not calculatable from the table schema.
-- If an ClickHouse SQL query can be generated, output the SQL query only without comments.
-
-# INPUT
-- Table name: `[_TABLE_NAME_]`
-- Table schema: `[_TABLE_SCHEMA_]`
-
-# QUESTION
-""";
-    private readonly string promptAddition = " Keep it short and simple.";
-
+    private AiConfig AiConfig { get; set; }
+    private IRagService RagService { get; set; }
+    private readonly string promptAddition = " Keep it short and as simple as possible.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -71,10 +45,14 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     /// <returns></returns>
     public async Task<string> Ask(string question)
     {
-        using HttpClient client = new()
+        using HttpClientHandler handler = new()
         {
-            BaseAddress = new Uri(OllamaUrl),
-            Timeout = TimeSpan.FromSeconds(30)
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(120)
         };
 
         // Add an Accept header for JSON format.
@@ -82,14 +60,29 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
         client.DefaultRequestHeaders.Accept.Add(mediaType);
 
-        string systemPrompt = "You are an expert for ClickHouse database systems. Answer questions related to ClickHouse databases only.";
+        string systemPrompt =
+"""
+Follow the instructions precisly. 
+Don't explain. 
+Output the answer only.
+Do not include any file links or URLs.
+Output plain text only without any formatting.
+Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
+""";
+    
+        OllamaRequestOptions options = new()
+        {
+            temperature = 0.1,
+            num_ctx = 8192
+        };
 
         OllamaRequest request = new()
         {
-            model = "sqlcoder:15b",
+            model = "gemma2:9b-instruct-q5_K_M",
             prompt = question,
             stream = false,
-            system = systemPrompt
+            system = systemPrompt,
+            options = options
         };
 
         // Create the JSON request content.
@@ -122,8 +115,9 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     /// <param name="question">The question to convert into a SQL query</param>
     /// <param name="database">The database the query will run on.</param>
     /// <param name="table">The table the query will run on.</param>
+    /// <param name="useEmbeddings">Whether to use embeddings for the question and query</param>
     /// <returns></returns>
-    public async Task<string> GenerateQuery(string question, string database, string table)
+    public async Task<string> GenerateQuery(string question, string database, string table, bool useEmbeddings)
     {
         // get source table definition from database
         string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
@@ -132,12 +126,18 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
             return "ERROR: Invalid table name!";
 
         // add table definition to the system prompt
-        string systemPrompt = SystemPrompt.Replace("[_TABLE_NAME_]", $"{database}.{table}");
+        string systemPrompt = AiConfig.SystemPrompt!;
+        systemPrompt = systemPrompt.Replace("[_TABLE_NAME_]", $"{database}.{table}");
         systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
 
-        using HttpClient client = new()
+        using HttpClientHandler handler = new()
         {
-            BaseAddress = new Uri(OllamaUrl),
+            UseProxy = false
+        };
+
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -154,10 +154,10 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
         var request = new OllamaRequest
         {
-            model = "sqlcoder:15b",
+            model = AiConfig.OllamaModel!,
             system = systemPrompt,
             prompt = question + promptAddition,
-            stream = false,
+            stream = false
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
@@ -195,9 +195,11 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
                 // get the query after the first SELECT until the first ';' character
                 int selectIndex = responseText.IndexOf("SELECT");
                 int semicolonIndex = responseText.IndexOf(';');
-                if(semicolonIndex == -1)
+                if (semicolonIndex == -1)
                 {
-                    semicolonIndex = responseText.Length - 1;
+                    // add semicolon to the end of the response
+                    responseText += ";";
+                    semicolonIndex = responseText.IndexOf(';');
                 }
 
                 if (selectIndex != -1)
@@ -205,6 +207,16 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
                     responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
 
+                if(useEmbeddings)
+                {
+                    // generate embedding for question and query
+                    var embedding = await RagService.GenerateEmbedding($"{question}\n\nSQL_QUERY: {responseText}", "search_document");
+                    if (embedding != null)
+                    {
+                        // store embedding in ClickHouse database
+                        await RagService.StoreSqlEmbedding(question, database, table, responseText, embedding);
+                    }
+                }
                 return responseText;
             }
             return jsonObject.response ?? "Unsuccessful query generation!";
@@ -216,32 +228,6 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     }
 
     /// <summary>
-    /// Generate a SQL query and execute it on the database
-    /// </summary>
-    /// <param name="question">The question to convert into a SQL query</param>
-    /// <param name="database">The database the query will run on.</param>
-    /// <param name="table">The table the query will run on.</param>
-    /// <returns>Result of the query.</returns>
-    public async Task<string> GenerateAndExecuteQuery(string question, string database, string table)
-    {
-        // generate the query
-        string query = await GenerateQuery(question, database, table);
-
-        try
-        {
-            // execute the query
-            var result = await DbService.ExecuteQueryDictionary(query);
-
-            // return the result as json string
-            return JsonSerializer.Serialize(result);
-        }
-        catch (Exception e)
-        {
-            return e.Message + "\n\nQuery: " + query;
-        }
-    }
-
-    /// <summary>
     /// Get first 10 rows of the table and ask AI to generate a list of possible questions
     /// </summary>
     /// <param name="database">The database to get the table from</param>
@@ -249,8 +235,8 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     /// <returns>List of possible questions</returns>
     public async Task<IList<string>> GetPossibleQuestions(string database, string table)
     {
-        // get first 100 rows of the table
-        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+        // get 20 random rows from the table
+        var rows = await DbService!.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} ORDER BY rand() LIMIT 10");
 
         // get source table definition from database
         string? tableDefinition = await ViewService!.GetViewDefinition(database, table);
@@ -261,21 +247,25 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         // add table definition to the system prompt
         string systemPrompt = """
 # IDENTITY and PURPOSE
-You are an expert for data analysis and medicial data.
-You are able to generate a list of related questions for analyzing a given dataset.
-Take a look at the EXAMPLE DATASET given below.
+
+You are an expert for data analysis of medical and biosample data.
+Your task is to create a list of related questions for the EXAMPLE DATASET given by the user.
+Take TABLE SCHEMA as a reference for the columns of the EXAMPLE DATASET.
 Precisely follow the instructions given to you.
 
 # TABLE SCHEMA
+
 [_TABLE_SCHEMA_]
 
-# EXAMPLE DATASET
 """;
-        
+
         systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
 
         // create a prompt with the table rows
         StringBuilder prompt = new();
+
+        prompt.AppendLine("# EXAMPLE DATASET");
+        prompt.AppendLine();
 
         // generate column header
         var columnHeaders = rows.First().Keys;
@@ -290,24 +280,31 @@ Precisely follow the instructions given to you.
 
         foreach (var row in rows)
         {
-            if(row == rows.First())
+            if (row == rows.First())
                 continue;
-            
+
             foreach (var column in row)
             {
                 prompt.Append($"\"{column.Value}\",");
             }
             prompt.AppendLine();
         }
-        prompt.AppendLine("# TASKS");
-        prompt.AppendLine("Generate a list of 5 to 10 related questions for analyzing the EXAMPLE DATASET." + 
-                          "Only ask questions about columns of the EXAMPLE DATASET. No explanations. No numberings. No bullet lists. " + 
-                          "Do not ask questions where columns are needed which are not present in the EXAMPLE DATASET. " +
-                          "Output the questions only, separated by newline characters.");
 
-        using HttpClient client = new()
+
+        prompt.AppendLine("# YOUR TASK:");
+        prompt.AppendLine();
+        prompt.AppendLine("Generate a list of 10 related questions for analyzing the EXAMPLE DATASET.\n" +
+                          "Only ask questions about existing columns of the EXAMPLE DATASET.\n" +
+                          "Don't ask questions for which to answer columns are needed that are not present in the EXAMPLE DATASET.\n" +
+                          "Output the questions only, separated by newline characters. No explanations. No numberings. No bullet lists.");
+
+        using HttpClientHandler handler = new()
         {
-            BaseAddress = new Uri(OllamaUrl),
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(60)
         };
 
@@ -319,15 +316,15 @@ Precisely follow the instructions given to you.
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0
+            temperature = 0.1
         };
 
         var request = new OllamaRequest
         {
-            model = "sqlcoder:15b",
+            model = "gemma2:9b-instruct-q5_K_M",
             system = systemPrompt,
             prompt = prompt.ToString(),
-            stream = false,
+            stream = false
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
@@ -344,9 +341,9 @@ Precisely follow the instructions given to you.
         {
             // Read the response object
             string jsonResponse = await response.Content.ReadAsStringAsync();
-            if(jsonResponse == null)
+            if (jsonResponse == null)
                 return ["ERROR: No response from Ollama API!"];
-            
+
             var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
 
             // Return the answer from the json object
@@ -373,60 +370,52 @@ Precisely follow the instructions given to you.
     }
 
     /// <summary>
-    /// Analyze the table and generate a list of column descriptions
+    /// Analyze the table and generate a list of column descriptions column by column
     /// </summary>
-    /// <param name="database">The database to get the table from</param>
     /// <param name="table">The table to get the rows from</param>
+    /// <param name="column">The column to get the description for</param>
+    /// <param name="datatype">The datatype of the column</param>
     /// <returns>Dictionary of column descriptions</returns>
-    public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
+    private async Task<string> GetColumnDescription(string table, string column, string datatype)
     {
         // get first 100 rows of the table
-        var rows = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{table} LIMIT 10");
+        //var rows = await DbService!.ExecuteQueryDictionary($"SELECT distinct(`{column}`) FROM {database}.{table} LIMIT 10");
 
         // add table definition to the system prompt
-        string systemPrompt = """
-# IDENTITY and PURPOSE
+        string systemPrompt =
+"""
+# Instructions:
 
-You are an expert for data analysis and medicial data.
-You are able to generate a list of descriptions for the columns of a given dataset.
-Take a look at the EXAMPLE DATASET given below.
-Be concise and precise.
+- You are an expert for biosample and medical data.
+- Be precise and concise and follow the instructions given to you.
+- Output the column description only, no bullet points or numbered lists.
+""";
 
-# EXAMPLE DATASET
+        string prompt = """
+# Instructions:
+
+Generate a description for a database column based on the following information:
+- Table Name: [TableName]
+- Column Name (DataType): [ColumnName] ([DataType])
+Output a short description only, no explanations. 
+
+# Output:
 
 """;
-        // create a prompt with the table rows
-        StringBuilder prompt = new();
 
-        // generate column header
-        var columnHeaders = rows.First().Keys;
-        foreach (var column in columnHeaders)
+        // insert table and column name into the prompt
+        prompt = prompt.Replace("[TableName]", table);
+        prompt = prompt.Replace("[ColumnName]", column);
+        prompt = prompt.Replace("[DataType]", datatype);
+
+        using HttpClientHandler handler = new()
         {
-            prompt.Append($"\"{column}\"");
-            if (column != columnHeaders.Last())
-                prompt.Append(',');
-        }
+            UseProxy = false
+        };
 
-        prompt.AppendLine();
-
-        foreach (var row in rows)
+        using HttpClient client = new(handler)
         {
-            if(row == rows.First())
-                continue;
-            
-            foreach (var column in row)
-            {
-                prompt.Append($"\"{column.Value}\",");
-            }
-            prompt.AppendLine();
-        }
-        prompt.AppendLine("\n# TASKS\n\n" + 
-                          "For every column in the EXAMPLE DATASET find an appropriate description.\n" + 
-                          "Output in the format: '[COLUMN1_NAME],[DESCRIPTION_1],\n[COLUMN2_NAME],[DESCRIPTION_2],\n...");
-
-        using HttpClient client = new()
-        {
-            BaseAddress = new Uri(OllamaUrl),
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -438,15 +427,15 @@ Be concise and precise.
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            temperature = 0.0
+            temperature = 0.1
         };
 
         var request = new OllamaRequest
         {
-            model = "sqlcoder:15b",
+            model = "gemma2:9b-instruct-q5_K_M",
             system = systemPrompt,
-            prompt = prompt.ToString(),
-            stream = false,
+            prompt = prompt,
+            stream = false
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
@@ -463,36 +452,44 @@ Be concise and precise.
         {
             // Read the response object
             string jsonResponse = await response.Content.ReadAsStringAsync();
-            if(jsonResponse == null)
-                return new Dictionary<string, string>() { { "ERROR", "No response from Ollama API!" } };
-            
+            if (jsonResponse == null)
+                return "";
+
             var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
 
             // Return the answer from the json object
             if (jsonObject!.response != null)
             {
-                string responseText = jsonObject.response.Trim();
-
-                // build dictionary from response ("column1,description1\n...")
-                var columnDescriptions = new Dictionary<string, string>();
-                var lines = responseText.Split('\n').Select(x => x.Trim()).ToList();
-                foreach (var line in lines)
-                {
-                    var parts = line.Split(',');
-                    if (parts.Length == 2)
-                    {
-                        columnDescriptions.Add(parts[0].Trim(), parts[1].Trim());
-                    }
-                }
-
-                return columnDescriptions;
+                return jsonObject.response.Trim();
             }
-            return new Dictionary<string, string>() { { "ERROR", "Unsuccessful generation of column descriptions!" } };
+            return "";
         }
         else
         {
             throw new Exception($"Error calling Ollama API: {response.StatusCode}");
         }
+    }
+
+    /// <summary>
+    /// Generate column descriptions for the specified table.
+    /// </summary>
+    /// <param name="database" example="default">The name of the database.</param>
+    /// <param name="table" example="trips">The name of the table.</param>
+    /// <returns>The dictionary of column descriptions.</returns>
+    public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
+    {
+        // get column names first
+        var columns = await ViewService!.GetViewColumns(database, table, false);
+
+        // iterate over columns and get descriptions
+        var columnDescriptions = new Dictionary<string, string>();
+        foreach (var column in columns)
+        {
+            var description = await GetColumnDescription(table, column.ColumnName!, column.DataType!);
+            columnDescriptions.Add(column.ColumnName!, description);
+        }
+
+        return columnDescriptions;
     }
 
     /// <summary>
@@ -502,14 +499,14 @@ Be concise and precise.
     public AiConfig GetAiConfig()
     {
         string sql = "SELECT Key, Value FROM ClickSphere.Config WHERE Section = 'AiConfig' order by Key";
-        var result = DbService.ExecuteQueryDictionary(sql).Result;
+        var result = DbService!.ExecuteQueryDictionary(sql).Result;
 
         AiConfig config = new();
 
         if (result.Count == 0)
             return config;
-        
-        foreach(var row in result)
+
+        foreach (var row in result)
         {
             if (row.ContainsKey("Key") && row.ContainsKey("Value"))
             {
@@ -540,18 +537,225 @@ Be concise and precise.
         try
         {
             // update ClickSphere.Config table (KEY, VALUE, SECTION)
-            string sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaUrl}' WHERE Key = 'OllamaUrl' AND Section = 'AiService'";
-            await DbService.ExecuteNonQuery(sql);
+            string sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaUrl}' WHERE Key = 'OllamaUrl' AND Section = 'AiConfig'";
+            await DbService!.ExecuteNonQuery(sql);
 
-            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaModel}' WHERE Key = 'OllamaModel' AND Section = 'AiService'";
-            await DbService.ExecuteNonQuery(sql);
+            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaModel}' WHERE Key = 'OllamaModel' AND Section = 'AiConfig'";
+            await DbService!.ExecuteNonQuery(sql);
 
-            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.SystemPrompt}' WHERE Key = 'SystemPrompt' AND Section = 'AiService'";
-            await DbService.ExecuteNonQuery(sql);
+            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.SystemPrompt}' WHERE Key = 'SystemPrompt' AND Section = 'AiConfig'";
+            await DbService!.ExecuteNonQuery(sql);
         }
         catch (Exception e)
         {
             throw new Exception($"Error updating AiConfig: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Get models from the Ollama API.
+    /// </summary>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    public IList<string> GetModels(CancellationToken token = default)
+    {
+        return GetModelsAsync(token).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Get models from the Ollama API.
+    /// </summary>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    public async Task<IList<string>> GetModelsAsync(CancellationToken token = default)
+    {
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+        List<string> models = [];
+        HttpResponseMessage? response = null;
+        try
+        {
+            response = await client.GetAsync(
+                "api/tags",
+                token).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+        if (response != null && response.IsSuccessStatusCode)
+        {
+            using var stream = await response.Content.ReadAsStreamAsync(token);
+            using var reader = new StreamReader(stream);
+            string? output = await reader.ReadToEndAsync(token);
+
+            if (output != null)
+            {
+                // only collect model names
+                var deserializedModels = JsonSerializer.Deserialize<OllamaModelRequest>(output)?.models;
+
+                if (deserializedModels != null)
+                {
+                    foreach (var model in deserializedModels)
+                    {
+                        models.Add(model!.name!);
+                    }
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine($"Request failed with status: {response?.StatusCode}.");
+        }
+
+        return models;
+    }
+
+    /// <summary>
+    /// Pulls a new model from the Ollama API.
+    /// </summary>
+    /// <param name="modelName">The name of the model to pull.</param>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    public async Task<Result> PullModelAsync(string modelName, CancellationToken token = default)
+    {
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+        HttpResponseMessage? response;
+        try
+        {
+            var requestBody = new
+            {
+                name = modelName,
+                insecure = false,
+                stream = true
+            };
+
+            response = await client.PostAsync(
+                "api/pull",
+                new StringContent(JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json"),
+                token).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                using var streamContent = await response.Content.ReadAsStreamAsync(token);
+                using var reader = new StreamReader(streamContent);
+
+                string? line;
+                DateTime lastNotificationTime = DateTime.MinValue;
+                while ((line = await reader.ReadLineAsync(token)) != null && !token.IsCancellationRequested)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        var statusUpdate = JsonSerializer.Deserialize<Dictionary<string, object>?>(line);
+                        if (statusUpdate == null)
+                            continue;
+
+                        string statusMessage = statusUpdate["status"]?.ToString() ?? "Model pull in progress";
+
+                        if (statusUpdate.TryGetValue("completed", out object? completed) &&
+                           statusUpdate.TryGetValue("total", out object? total))
+                        {
+                            statusMessage += $" ({completed}/{total})";
+                        }
+
+                        // Check if 5 seconds have passed since the last notification
+                        if ((DateTime.Now - lastNotificationTime).TotalSeconds >= 5)
+                        {
+                            Console.WriteLine(statusMessage);
+                            lastNotificationTime = DateTime.Now;
+                        }
+
+                        if (statusUpdate!.ContainsKey("completed") == true)
+                        {
+                            if (statusUpdate["completed"]?.ToString() == statusUpdate["total"]?.ToString())
+                            {
+                                break;
+                            }
+                        }
+
+                        // handle errors
+                        if (statusUpdate!.ContainsKey("error"))
+                        {
+                            return new Result(false, "Model pull failed. Error: " + statusUpdate["error"]);
+                        }
+                    }
+                }
+                return new Result(true, "Model pull completed.");
+            }
+            else
+            {
+                return new Result(false, "Model pull failed with status: " + response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            return new Result(false, "Model pull failed. Error: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Deletes a model from Ollama.
+    /// </summary>
+    /// <param name="modelName">The name of the model to delete.</param>
+    /// <returns>The result of the operation.</returns>
+    public async Task<Result> DeleteModelAsync(string modelName)
+    {
+        // create a new HttpClient and HttpClientHandler
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+        // Send a POST request to the Ollama API
+        HttpResponseMessage? response;
+        try
+        {
+            var requestBody = new
+            {
+                name = modelName
+            };
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/delete")
+            {
+                Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
+            };
+            response = await client.SendAsync(request, CancellationToken.None).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return new Result(true, "Model deleted successfully.");
+            }
+            else
+            {
+                return new Result(false, "Model deletion failed with status: " + response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            return new Result(false, "Model deletion failed. Error: " + ex.Message);
         }
     }
 }

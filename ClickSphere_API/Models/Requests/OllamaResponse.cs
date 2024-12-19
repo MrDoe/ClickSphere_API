@@ -24,29 +24,3 @@ public class OllamaResponse
     /// </summary>
     public required bool done { get; set; }
 }
-
-/// <summary>
-/// Represents the response from the Ollama API.
-/// </summary>
-public class Response
-{
-    /// <summary>
-    /// Gets or sets the query.
-    /// </summary>
-    public string? query { get; set; }
-    
-    /// <summary>
-    /// Gets or sets the answer.
-    /// </summary>
-    public string? answer { get; set; }
-    
-    /// <summary>
-    /// Gets or sets the explanation.
-    /// </summary>
-    public string? explanation { get; set; }
-    
-    /// <summary>
-    /// Gets or sets the SQL statement.
-    /// </summary>
-    public string? sql { get; set; }
-}
