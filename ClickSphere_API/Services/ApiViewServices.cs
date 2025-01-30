@@ -432,7 +432,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         {
             query += $"`{column["COLUMN_NAME"]}` {column["DATA_TYPE"]} ";
 
-            if(column["IS_NULLABLE"].ToString() == "YES")
+            if(column["IS_NULLABLE"].ToString() == "YES"  && column["COLUMN_NAME"].ToString()?.ToUpper() != "ID")
                 query += "NULL DEFAULT NULL";
             else
                 query += "NOT NULL";

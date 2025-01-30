@@ -27,7 +27,7 @@ namespace ClickSphere_API.Controllers
         /// <summary>
         /// Create a new database.
         /// </summary>
-        /// <param name="database" example="default">The name of the database to create.</param>
+        /// <param name="database" example="ClickSphere">The name of the database to create.</param>
         /// <returns>The result of the database creation.</returns>
         [Authorize]
         [HttpPost]

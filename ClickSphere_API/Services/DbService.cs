@@ -14,10 +14,6 @@ public class DbService : IDbService
     private readonly ClickHouseConnectionStringBuilder? _connString;
     private string Host { get; set; }
     private ushort Port { get; set; }
-    private readonly string ODBC_DSN;
-    private readonly string ODBC_User;
-    private readonly string ODBC_Password;
-    private readonly string ODBC_Database;
     private static bool _initialized = false;
 
     /// <summary>
@@ -39,11 +35,6 @@ public class DbService : IDbService
 
         if (configuration["ClickHouse:User"] == null)
             throw new ArgumentNullException(nameof(configuration), "ClickHouse:User");
-
-        ODBC_DSN = configuration["ODBC:DSN"] ?? "";
-        ODBC_User = configuration["ODBC:User"] ?? "";
-        ODBC_Password = configuration["ODBC:Password"] ?? "";
-        ODBC_Database = configuration["ODBC:Database"] ?? "";
 
         _connString = new ClickHouseConnectionStringBuilder
         {

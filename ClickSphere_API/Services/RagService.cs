@@ -115,7 +115,7 @@ public class RagService : IRagService
         using HttpClient client = new(handler)
         {
             BaseAddress = new Uri(AiConfig!.OllamaUrl!),
-            Timeout = TimeSpan.FromSeconds(60)
+            Timeout = TimeSpan.FromSeconds(15)
         };
 
         // Add an Accept header for JSON format
@@ -145,7 +145,15 @@ public class RagService : IRagService
             mediaType);
 
         // Send POST request to the Ollama API
-        HttpResponseMessage response = await client.PostAsync("api/embed", jsonContent);
+        HttpResponseMessage response;
+        try 
+        {
+            response = await client.PostAsync("api/embed", jsonContent);
+        }
+        catch (Exception e)
+        {
+            throw new Exception($"Error calling Ollama API: {e.Message}");
+        }
 
         if (response.IsSuccessStatusCode)
         {
@@ -222,7 +230,7 @@ public class RagService : IRagService
         // get the most similar embeddings from the database
         string sql = $"SELECT SQL_Query, L2Distance(Embedding_Question, [{embeddingString}]) as Distance " +
                       "FROM ClickSphere.Embeddings " +
-                     $"WHERE L2Distance(Embedding_Question, [{embeddingString}]) < 2.0 " +
+                     $"WHERE L2Distance(Embedding_Question, [{embeddingString}]) < 0.5 " +
                      $"AND Database = '{database}' AND Table = '{table}' AND isNotNull(Embedding_Question) " +
                      $"ORDER BY 2 DESC";
         var result = await DbService!.ExecuteQueryDictionary(sql);
@@ -272,8 +280,10 @@ public class RagService : IRagService
     /// <param name="keyword">The keyword to search for in the documents</param>
     /// <param name="distance">The distance threshold for the search</param>
     /// <returns>List of embeddings of the documents</returns>
-    public async Task<IList<string>> GetRagDocuments(string keyword, float distance)
+    public async Task<IList<string>> GetRagDocuments(string keyword, int distance)
     {
+        string sDistance = ((float)distance / 100.0f).ToString("0.00");
+
         // generate embedding for the keyword
         var embedding = await GenerateEmbedding(keyword, "Represent this sentence for searching relevant passages");
 
@@ -286,12 +296,19 @@ public class RagService : IRagService
         // get the most similar embeddings from the database
         string sql =  "SELECT FilePath, FileContent, Embedding " +
                       "FROM ClickSphere.RAG " +
-                     $"WHERE cosineDistance(Embedding, [{embeddingString}]) < {distance} " +
+                     $"WHERE cosineDistance(Embedding, [{embeddingString}]) < {sDistance} " +
                      $"ORDER BY cosineDistance(Embedding, [{embeddingString}]) ASC LIMIT 20";
 
         var result = await DbService!.ExecuteQueryDictionary(sql);
 
+        if(result.Count == 0)
+            return [];
+        
         // trim the results to only the FileContent
-        return [.. result.Select(x => x["FileContent"].ToString()?.Trim('\n').Trim() ?? "")];
+        //return [.. result.Select(x => x["FileContent"].ToString()?.Trim('\n').Trim() ?? "")];
+
+        // get file path only
+        IList<string> resultList = [.. result.Select(x => x["FilePath"].ToString()?.Trim('\n').Trim() ?? "")];
+        return resultList;
     }
 }

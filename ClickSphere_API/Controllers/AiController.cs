@@ -11,7 +11,7 @@ namespace ClickSphere_API.Controllers;
 /// Interface to the Ollama AI service.
 /// </summary>
 [ApiController]
-public class AiController(IAiService AiService, IRagService RagService) : ControllerBase
+public class AiController(IAiService AiService, IRagService RagService, IDbService DbService) : ControllerBase
 {
     /// <summary>
     /// Ask the AI a question. Call the Ollama API
@@ -130,7 +130,7 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
         // Generate embedding for the document
         string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
 
-        var embedding = await RagService.GenerateEmbedding(content, "doc.Filename");
+        var embedding = await RagService.GenerateEmbedding(content, "File");
         if (embedding == null)
         {
             return false;
@@ -145,39 +145,69 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
     }
 
     /// <summary>
+    /// Store the embedding of view column data in the RAG table.
+    /// </summary>
+    /// <param name="database" example="ClickSphere">The name of the database.</param>
+    /// <param name="viewName" example="V_HCC_Nexus">The name of the view.</param>
+    /// <param name="dataColumn" example="osnBefundText">The column to store as embedding.</param>
+    /// <param name="keyColumn" example="osnMateriealarten">The column to use as key for the embedding.</param>
+    /// <returns>True if the embedding was stored successfully.</returns>
+    [Route("/storeViewColumnEmbedding")]
+    [HttpPost]
+    public async Task<bool> StoreViewColumnEmbedding(string database, string viewName, string dataColumn, string keyColumn)
+    {
+        if(string.IsNullOrEmpty(viewName) || string.IsNullOrEmpty(dataColumn) || string.IsNullOrEmpty(database))
+            return false;
+
+        // Iterate over data of the view
+        var dataset = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{viewName}");
+      
+        if (dataset == null || dataset.Count == 0)
+            return false;
+        
+        // Generate embedding for each dataset of the column data
+        foreach (var row in dataset)
+        {
+            if (!row.ContainsKey(dataColumn))
+                return false;
+            
+            string? columnData = row[dataColumn].ToString();
+            
+            if(string.IsNullOrEmpty(columnData))
+                return false;
+            
+            var embedding = await RagService.GenerateEmbedding(columnData, "search_query");
+            if (embedding == null)
+            {
+                return false;
+            }
+            await RagService.StoreRagEmbedding(row[keyColumn].ToString() ?? "", columnData, embedding[0]);
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Get the document contents from the RAG table by a keyword by doing RAG search.
     /// </summary>
-    /// <param name="keyword">The keyword to search for in the documents.</param>
-    /// <param name="distance">The distance threshold for the search.</param>
+    /// <param name="b64Keywords">The keyword to search for in the documents.</param>
+    /// <param name="distance">The distance threshold for the search (from -100 to 100).</param>
     /// <returns>The list documents.</returns>
-    [Authorize]
+    //[Authorize]
     [Route("/getRagDocuments")]
     [HttpGet]
-    public async Task<string> GetRagDocuments(string keyword, float distance)
+    public async Task<IList<string>> GetRagDocuments(string b64Keywords, int distance)
     {
-        keyword = "Extract all relevant documents which may be important for answering this question: " + keyword;
-        IList<string> documents = await RagService.GetRagDocuments(keyword, distance);
-        if (documents.Count == 0)
-        {
-            return "No documents found";
-        }
+        // decode base64 keywords
+        string keywords = Encoding.UTF8.GetString(Convert.FromBase64String(b64Keywords));
 
-        // re-query the AI with the documents to get the function definitions, datatypes and descriptions only
-        string prompt = "Don't output URLs. Output no formatting, no markdown, no bullet points or lists. Extract function definition from this text, if possible: '";
-        IList<string> responses = [];
-        foreach(var doc in documents)
-        {
-            string docPrompt = prompt + doc + "' If not, output nothing.";
-            string response = await AiService.Ask(docPrompt);
-            response = response.Replace("\r", "").Replace("\n\n", "\n").Replace("`", "").Trim();
-            if(response != "")
-            {
-                // check for duplicates
-                if (!responses.Contains(response))
-                    responses.Add(response);
-            }
-        }
-        string output = string.Join("\n", responses);
-        return output;
+        // add prefix to the keywords
+        keywords = "Get all relevant documents which may be important for answering this question: " + keywords;
+
+        IList<string> documents = await RagService.GetRagDocuments(keywords, distance);
+
+        if (documents.Count == 0)
+            return [];
+        else
+            return documents;
     }
 }

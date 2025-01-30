@@ -51,7 +51,7 @@ public interface IRagService
     /// Get the document contents from the RAG table by a keyword by doing RAG search.
     /// </summary>
     /// <param name="keyword">The keyword to search for in the documents</param>
-    /// <param name="distance">The distance threshold for the search</param>
+    /// <param name="distance">The distance threshold for the search (from -100 to 100)</param>
     /// <returns>List of embeddings of the documents</returns>
-    Task<IList<string>> GetRagDocuments(string keyword, float distance);
+    Task<IList<string>> GetRagDocuments(string keyword, int distance);
 }
