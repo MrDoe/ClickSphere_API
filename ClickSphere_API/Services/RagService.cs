@@ -77,7 +77,7 @@ public class RagService : IRagService
             var query = @"
                 CREATE TABLE IF NOT EXISTS ClickSphere.RAG
                 (
-                    Id UInt32,
+                    Id UInt64,
                     FilePath String,
                     FileContent String,
                     Embedding Array(Float32)
@@ -89,6 +89,16 @@ public class RagService : IRagService
 
             // create index on the embedding column
             query = "CREATE INDEX IF NOT EXISTS rag_embedding_index ON ClickSphere.RAG(Embedding) TYPE minmax GRANULARITY 1";
+            await DbService.ExecuteNonQuery(query);
+
+            // Create table for RAG search results
+            query = @"
+                CREATE TABLE IF NOT EXISTS ClickSphere.RAGresult (
+                Id Int64,
+                FilePath String, 
+                Distance Float, 
+                SessionId UUID NOT NULL
+                ) ENGINE Memory";
             await DbService.ExecuteNonQuery(query);
 
             return Results.Ok();
@@ -128,10 +138,14 @@ public class RagService : IRagService
             //temperature = 0.1 // keep default value
         };
 
+        // add task type to the input (required for some models)
+        if(!string.IsNullOrEmpty(taskType))
+            input = taskType + ": " + input;
+
         var request = new OllamaEmbed
         {
-            model = "mxbai-embed-large",
-            input = taskType + ": " + input,
+            model = "snowflake-arctic-embed2",
+            input = input,
             truncate = true,
             options = requestOptions,
             keep_alive = "5m"
@@ -228,9 +242,9 @@ public class RagService : IRagService
         string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
 
         // get the most similar embeddings from the database
-        string sql = $"SELECT SQL_Query, L2Distance(Embedding_Question, [{embeddingString}]) as Distance " +
+        string sql = $"SELECT SQL_Query, cosineDistance(Embedding_Question, [{embeddingString}]) as Distance " +
                       "FROM ClickSphere.Embeddings " +
-                     $"WHERE L2Distance(Embedding_Question, [{embeddingString}]) < 0.5 " +
+                     $"WHERE cosineDistance(Embedding_Question, [{embeddingString}]) < 0.2 " +
                      $"AND Database = '{database}' AND Table = '{table}' AND isNotNull(Embedding_Question) " +
                      $"ORDER BY 2 DESC";
         var result = await DbService!.ExecuteQueryDictionary(sql);
@@ -241,11 +255,12 @@ public class RagService : IRagService
     /// <summary>
     /// Store embedding of document in RAG table
     /// </summary>
+    /// <params name="id">The id of the data set</params>
     /// <params name="filename">The file name of the source file</params>
     /// <params name="document">The document as plain text</params>
     /// <params name="embedding">The embedding of the document</params>
     /// <returns>True if the embedding was stored successfully</returns>
-    public async Task<bool> StoreRagEmbedding(string filename, string document, List<float> embedding)
+    public async Task<bool> StoreRagEmbedding(long id, string filename, string document, List<float> embedding)
     {
         // convert embedding to string
         string embeddingString = string.Join(",", embedding.Select(x => x.ToString()));
@@ -262,8 +277,8 @@ public class RagService : IRagService
         {
             // insert embedding into ClickSphere.RAG table
             string sql = "INSERT INTO ClickSphere.RAG " +
-                         "(FilePath, FileContent, Embedding) " +
-                        $"VALUES ('{filename}', '{document}', '[{embeddingString}]')";
+                         "(Id, FilePath, FileContent, Embedding) " +
+                        $"VALUES ({id}, '{filename}', '{document}', '[{embeddingString}]')";
             await DbService!.ExecuteNonQuery(sql);
         }
         catch (Exception e)
@@ -279,36 +294,55 @@ public class RagService : IRagService
     /// </summary>
     /// <param name="keyword">The keyword to search for in the documents</param>
     /// <param name="distance">The distance threshold for the search</param>
-    /// <returns>List of embeddings of the documents</returns>
-    public async Task<IList<string>> GetRagDocuments(string keyword, int distance)
+    /// <returns>Session id for search results</returns>
+    public async Task<Guid?> GetRagDocuments(string keyword, int distance)
     {
         string sDistance = ((float)distance / 100.0f).ToString("0.00");
 
         // generate embedding for the keyword
-        var embedding = await GenerateEmbedding(keyword, "Represent this sentence for searching relevant passages");
-
+        // taskType "Represent this sentence for searching relevant passages"
+        var embedding = await GenerateEmbedding(keyword, "");
         if (embedding == null)
-            return [];
+            return null;
 
         // convert embedding to string
         string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
 
         // get the most similar embeddings from the database
-        string sql =  "SELECT FilePath, FileContent, Embedding " +
-                      "FROM ClickSphere.RAG " +
-                     $"WHERE cosineDistance(Embedding, [{embeddingString}]) < {sDistance} " +
-                     $"ORDER BY cosineDistance(Embedding, [{embeddingString}]) ASC LIMIT 20";
+        string sql = $"WITH EmbeddingCTE AS (" +
+                    $"SELECT [{embeddingString}] AS EmbeddingString" +
+                    $") " +
+                    $"SELECT Id, FilePath, cosineDistance(Embedding, EmbeddingString) as Distance " +
+                    $"FROM ClickSphere.RAG, EmbeddingCTE " +
+                    $"WHERE cosineDistance(Embedding, EmbeddingString) < {sDistance} " +
+                    $"ORDER BY cosineDistance(Embedding, EmbeddingString) ASC LIMIT 1000";
 
         var result = await DbService!.ExecuteQueryDictionary(sql);
 
         if(result.Count == 0)
-            return [];
+            return null;
         
-        // trim the results to only the FileContent
-        //return [.. result.Select(x => x["FileContent"].ToString()?.Trim('\n').Trim() ?? "")];
+        // create session id
+        var sessionId = Guid.NewGuid();
 
-        // get file path only
-        IList<string> resultList = [.. result.Select(x => x["FilePath"].ToString()?.Trim('\n').Trim() ?? "")];
-        return resultList;
+        // store output to temporary table
+        string sqlQuery = "";
+        foreach (var row in result)
+        {
+            sqlQuery += @$"
+            INSERT INTO ClickSphere.RAGresult
+            ( Id,
+              FilePath, 
+              Distance, 
+              SessionId ) 
+            VALUES (
+             {row["Id"]},
+            '{row["FilePath"]}',
+             {row["Distance"]},
+            '{sessionId}');";
+        }
+        await DbService.ExecuteNonQuery(sqlQuery);
+
+        return sessionId;
     }
 }

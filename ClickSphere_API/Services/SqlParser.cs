@@ -54,8 +54,6 @@ namespace ClickSphere_API.Services
                 charIndex++;
             }
 
-
-
             // Check if the query starts with a data modifying statement
             if (upperQuery.StartsWith("INSERT INTO") || upperQuery.StartsWith("UPDATE") || upperQuery.StartsWith("DELETE") ||
                 upperQuery.StartsWith("DROP") || upperQuery.StartsWith("GRANT") || upperQuery.StartsWith("REVOKE") ||
@@ -91,9 +89,7 @@ namespace ClickSphere_API.Services
         private static bool IsSqlKeyword(string word)
         {
             // filter only the keywords that are used in the application
-            var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET"};
-
-            //var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "AS", "JOIN", "ON", "INNER", "OUTER", "LEFT", "RIGHT", "FULL", "CROSS", "UNION", "ALL", "EXCEPT", "INTERSECT", "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET", "INTO", "OUTFILE", "DUMPFILE" };
+            var keywords = new[] { "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS", "NULL", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET", "BY", "ORDER"};
             return keywords.Contains(word.ToUpperInvariant());
         }
 
@@ -103,7 +99,7 @@ namespace ClickSphere_API.Services
             return MyRegex().IsMatch(name);
         }
 
-        [GeneratedRegex(@"^[\*a-zA-Z0-9_\s`'""@!=<>\(\)%\.\,:\-\/\+\%]+$")]
+        [GeneratedRegex(@"^[\*a-zA-Z0-9_\s`'""@!=<>\(\)%\.\,:\-\/\+\%\[\]]+$")]
         private static partial Regex MyRegex();
     }
 

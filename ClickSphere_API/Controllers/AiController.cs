@@ -130,7 +130,7 @@ public class AiController(IAiService AiService, IRagService RagService, IDbServi
         // Generate embedding for the document
         string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
 
-        var embedding = await RagService.GenerateEmbedding(content, "File");
+        var embedding = await RagService.GenerateEmbedding(content, "");
         if (embedding == null)
         {
             return false;
@@ -139,7 +139,7 @@ public class AiController(IAiService AiService, IRagService RagService, IDbServi
         if (string.IsNullOrEmpty(content))
             return false;
         else
-            await RagService.StoreRagEmbedding(doc.Filename, content, embedding[0]);
+            await RagService.StoreRagEmbedding(doc.Id, doc.Filename, content, embedding[0]);
 
         return true;
     }
@@ -150,7 +150,7 @@ public class AiController(IAiService AiService, IRagService RagService, IDbServi
     /// <param name="database" example="ClickSphere">The name of the database.</param>
     /// <param name="viewName" example="V_HCC_Nexus">The name of the view.</param>
     /// <param name="dataColumn" example="osnBefundText">The column to store as embedding.</param>
-    /// <param name="keyColumn" example="osnMateriealarten">The column to use as key for the embedding.</param>
+    /// <param name="keyColumn" example="ID">The column to use as key for the embedding.</param>
     /// <returns>True if the embedding was stored successfully.</returns>
     [Route("/storeViewColumnEmbedding")]
     [HttpPost]
@@ -168,7 +168,7 @@ public class AiController(IAiService AiService, IRagService RagService, IDbServi
         // Generate embedding for each dataset of the column data
         foreach (var row in dataset)
         {
-            if (!row.ContainsKey(dataColumn))
+            if (!row.ContainsKey(dataColumn) || !row.ContainsKey(keyColumn))
                 return false;
             
             string? columnData = row[dataColumn].ToString();
@@ -176,12 +176,23 @@ public class AiController(IAiService AiService, IRagService RagService, IDbServi
             if(string.IsNullOrEmpty(columnData))
                 return false;
             
-            var embedding = await RagService.GenerateEmbedding(columnData, "search_query");
+            var embedding = await RagService.GenerateEmbedding(columnData, "");
             if (embedding == null)
             {
                 return false;
             }
-            await RagService.StoreRagEmbedding(row[keyColumn].ToString() ?? "", columnData, embedding[0]);
+
+            // get id from key column
+            long id;
+            try 
+            {
+               id = Convert.ToInt64(row[keyColumn]);
+            }
+            catch
+            {
+                return false;
+            }
+            await RagService.StoreRagEmbedding(id, "", columnData, embedding[0]);
         }
         return true;
     }
@@ -195,19 +206,14 @@ public class AiController(IAiService AiService, IRagService RagService, IDbServi
     //[Authorize]
     [Route("/getRagDocuments")]
     [HttpGet]
-    public async Task<IList<string>> GetRagDocuments(string b64Keywords, int distance)
+    public async Task<Guid?> GetRagDocuments(string b64Keywords, int distance)
     {
         // decode base64 keywords
         string keywords = Encoding.UTF8.GetString(Convert.FromBase64String(b64Keywords));
 
-        // add prefix to the keywords
+        //add prefix to the keywords
         keywords = "Get all relevant documents which may be important for answering this question: " + keywords;
 
-        IList<string> documents = await RagService.GetRagDocuments(keywords, distance);
-
-        if (documents.Count == 0)
-            return [];
-        else
-            return documents;
+        return await RagService.GetRagDocuments(keywords, distance);
     }
 }
