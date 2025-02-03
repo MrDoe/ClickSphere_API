@@ -3,6 +3,7 @@ using System.Reflection;
 using ClickSphere_API.Models;
 using Microsoft.AspNetCore.SignalR;
 using Octonica.ClickHouseClient;
+using Octonica.ClickHouseClient.Exceptions;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -215,6 +216,44 @@ public class DbService : IDbService
     }
 
     /// <summary>
+    /// Execute bulk insert on the ClickHouse database
+    /// </summary>
+    /// <param name="database">The name of the database</param>
+    /// <param name="tableName">The name of the table</param>
+    /// <param name="columnNames">The names of the columns to insert</param>
+    /// <param name="data">The data to insert</param>
+    public async Task ExecuteBulkInsert(string database, string tableName, string[] columnNames,
+                                        IReadOnlyList<object[]?> data)
+    {
+        using var connection = CreateConnection();
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        try
+        {
+            await using var writer = await connection.CreateColumnWriterAsync(
+                $"INSERT INTO {database}.{tableName} ({string.Join(", ", columnNames)}) VALUES", default);
+
+            // split data into columns
+            var columnData = new List<object[]>();
+            for (int i = 0; i < columnNames.Length; ++i)
+            {
+                var column = new object[data.Count];
+                for (int j = 0; j < data.Count; ++j)
+                {
+                    column[j] = data[j]![i];
+                }
+                columnData.Add(column);
+            }
+
+            await writer.WriteTableAsync(columnData, data.Count, default);
+        }
+        catch (ClickHouseException e)
+        {
+            throw new Exception(e.Message);
+        }
+    }
+
+    /// <summary>
     /// Execute a scalar query on the ClickHouse database
     /// </summary>
     /// <param name="query">The query to be executed</param>
@@ -240,7 +279,7 @@ public class DbService : IDbService
 
         string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
         await ExecuteNonQuery(query);
-        
+
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Config (Key String, Value String, Section String) ENGINE = MergeTree() PRIMARY KEY(Key, Section)";
         await ExecuteNonQuery(query);
 
@@ -290,7 +329,7 @@ public class DbService : IDbService
         await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
-        await ExecuteNonQuery(query); 
+        await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Embeddings (Id UUID, Question String, Database String, Table String, SQL_Query String, Embedding_Question Array(Float32)) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);

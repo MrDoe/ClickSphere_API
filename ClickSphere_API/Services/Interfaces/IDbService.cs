@@ -55,4 +55,13 @@ public interface IDbService
     /// <param name="query">The query to execute.</param>
     /// <returns>A list of objects of type T.</returns>
     Task<List<T>> ExecuteQueryList<T>(string query) where T : class, new();
+
+    /// <summary>
+    /// Executes a bulk insert operation.
+    /// </summary>
+    /// <param name="database">The name of the database.</param>
+    /// <param name="tableName">The name of the table.</param>
+    /// <param name="columnNames">The column names.</param>
+    /// <param name="data">The data to insert.</param>
+    Task ExecuteBulkInsert(string database, string tableName, string[] columnNames, IReadOnlyList<object[]?> data);
 }

@@ -3,15 +3,13 @@ using Microsoft.AspNetCore.Authorization;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Models;
-using System.Text;
-using System.Linq;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
 /// Interface to the Ollama AI service.
 /// </summary>
 [ApiController]
-public class AiController(IAiService AiService, IRagService RagService, IDbService DbService) : ControllerBase
+public class AiController(IAiService AiService, IRagService RagService) : ControllerBase
 {
     /// <summary>
     /// Ask the AI a question. Call the Ollama API
@@ -111,109 +109,5 @@ public class AiController(IAiService AiService, IRagService RagService, IDbServi
     {
         // Call the Ollama API
         await AiService.SetAiConfig(config);
-    }
-
-    /// <summary>
-    /// Store the embedding of a document in the RAG table.
-    /// </summary>
-    /// <param name="doc">The document to store the embedding.</param>
-    /// <returns>True if the embedding was stored successfully.</returns>
-    [Authorize]
-    [Route("/storeRagEmbedding")]
-    [HttpPost]
-    public async Task<bool> StoreRagEmbedding(Document doc)
-    {
-        if (doc == null || doc.Filename == null || doc.Content == null)
-        {
-            return false;
-        }
-        // Generate embedding for the document
-        string? content = Encoding.UTF8.GetString(Convert.FromBase64String(doc.Content));
-
-        var embedding = await RagService.GenerateEmbedding(content, "");
-        if (embedding == null)
-        {
-            return false;
-        }
-        // decode content from base64
-        if (string.IsNullOrEmpty(content))
-            return false;
-        else
-            await RagService.StoreRagEmbedding(doc.Id, doc.Filename, content, embedding[0]);
-
-        return true;
-    }
-
-    /// <summary>
-    /// Store the embedding of view column data in the RAG table.
-    /// </summary>
-    /// <param name="database" example="ClickSphere">The name of the database.</param>
-    /// <param name="viewName" example="V_HCC_Nexus">The name of the view.</param>
-    /// <param name="dataColumn" example="osnBefundText">The column to store as embedding.</param>
-    /// <param name="keyColumn" example="ID">The column to use as key for the embedding.</param>
-    /// <returns>True if the embedding was stored successfully.</returns>
-    [Route("/storeViewColumnEmbedding")]
-    [HttpPost]
-    public async Task<bool> StoreViewColumnEmbedding(string database, string viewName, string dataColumn, string keyColumn)
-    {
-        if(string.IsNullOrEmpty(viewName) || string.IsNullOrEmpty(dataColumn) || string.IsNullOrEmpty(database))
-            return false;
-
-        // Iterate over data of the view
-        var dataset = await DbService.ExecuteQueryDictionary($"SELECT * FROM {database}.{viewName}");
-      
-        if (dataset == null || dataset.Count == 0)
-            return false;
-        
-        // Generate embedding for each dataset of the column data
-        foreach (var row in dataset)
-        {
-            if (!row.ContainsKey(dataColumn) || !row.ContainsKey(keyColumn))
-                return false;
-            
-            string? columnData = row[dataColumn].ToString();
-            
-            if(string.IsNullOrEmpty(columnData))
-                return false;
-            
-            var embedding = await RagService.GenerateEmbedding(columnData, "");
-            if (embedding == null)
-            {
-                return false;
-            }
-
-            // get id from key column
-            long id;
-            try 
-            {
-               id = Convert.ToInt64(row[keyColumn]);
-            }
-            catch
-            {
-                return false;
-            }
-            await RagService.StoreRagEmbedding(id, "", columnData, embedding[0]);
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Get the document contents from the RAG table by a keyword by doing RAG search.
-    /// </summary>
-    /// <param name="b64Keywords">The keyword to search for in the documents.</param>
-    /// <param name="distance">The distance threshold for the search (from -100 to 100).</param>
-    /// <returns>The list documents.</returns>
-    //[Authorize]
-    [Route("/getRagDocuments")]
-    [HttpGet]
-    public async Task<Guid?> GetRagDocuments(string b64Keywords, int distance)
-    {
-        // decode base64 keywords
-        string keywords = Encoding.UTF8.GetString(Convert.FromBase64String(b64Keywords));
-
-        //add prefix to the keywords
-        keywords = "Get all relevant documents which may be important for answering this question: " + keywords;
-
-        return await RagService.GetRagDocuments(keywords, distance);
     }
 }

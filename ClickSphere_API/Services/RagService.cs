@@ -4,8 +4,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
 using ClickSphere_API.Models.Requests;
-using ClickSphere_API.Services;
-
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -80,25 +78,33 @@ public class RagService : IRagService
                     Id UInt64,
                     FilePath String,
                     FileContent String,
+                    Database String,
+                    TableName String,
+                    ColumnName String,
                     Embedding Array(Float32)
                 )
                 ENGINE = MergeTree()
                 ORDER BY Id";
-
+            
             await DbService!.ExecuteNonQuery(query);
 
             // create index on the embedding column
             query = "CREATE INDEX IF NOT EXISTS rag_embedding_index ON ClickSphere.RAG(Embedding) TYPE minmax GRANULARITY 1";
             await DbService.ExecuteNonQuery(query);
 
+            // create index on database, table, and column
+            query = "CREATE INDEX IF NOT EXISTS rag_database_table_column_index ON ClickSphere.RAG(Database, TableName, ColumnName) TYPE minmax GRANULARITY 1";
+            await DbService.ExecuteNonQuery(query);
+
             // Create table for RAG search results
             query = @"
                 CREATE TABLE IF NOT EXISTS ClickSphere.RAGresult (
-                Id Int64,
-                FilePath String, 
-                Distance Float, 
-                SessionId UUID NOT NULL
-                ) ENGINE Memory";
+                Id UInt64,
+                FilePath String,
+                Distance Float,
+                SessionId UUID NOT NULL)
+                ENGINE Memory";
+            
             await DbService.ExecuteNonQuery(query);
 
             return Results.Ok();
@@ -125,7 +131,7 @@ public class RagService : IRagService
         using HttpClient client = new(handler)
         {
             BaseAddress = new Uri(AiConfig!.OllamaUrl!),
-            Timeout = TimeSpan.FromSeconds(15)
+            Timeout = TimeSpan.FromSeconds(30)
         };
 
         // Add an Accept header for JSON format
@@ -148,7 +154,7 @@ public class RagService : IRagService
             input = input,
             truncate = true,
             options = requestOptions,
-            keep_alive = "5m"
+            keep_alive = "15m"
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
@@ -258,9 +264,12 @@ public class RagService : IRagService
     /// <params name="id">The id of the data set</params>
     /// <params name="filename">The file name of the source file</params>
     /// <params name="document">The document as plain text</params>
-    /// <params name="embedding">The embedding of the document</params>
-    /// <returns>True if the embedding was stored successfully</returns>
-    public async Task<bool> StoreRagEmbedding(long id, string filename, string document, List<float> embedding)
+    /// <params name="database">The database where the document is stored</params>
+    /// <params name="tableName">The table name where the document is stored</params>
+    /// <params name="columnName">The column where the document is stored</params>
+    /// <params name="embedding">The embedding vector of the document</params>
+    public async Task StoreRagEmbedding(long id, string filename, string document, string database,
+                                        string tableName, string columnName, List<float> embedding)
     {
         // convert embedding to string
         string embeddingString = string.Join(",", embedding.Select(x => x.ToString()));
@@ -277,16 +286,16 @@ public class RagService : IRagService
         {
             // insert embedding into ClickSphere.RAG table
             string sql = "INSERT INTO ClickSphere.RAG " +
-                         "(Id, FilePath, FileContent, Embedding) " +
-                        $"VALUES ({id}, '{filename}', '{document}', '[{embeddingString}]')";
+                         "(Id, FilePath, FileContent, Database, TableName, ColumnName, Embedding) " +
+                         $"VALUES ({id},'{filename}','{document}','{database}','{tableName}','{columnName}'," + 
+                         $"'[{embeddingString}]')";
+
             await DbService!.ExecuteNonQuery(sql);
         }
         catch (Exception e)
         {
             throw new Exception($"Error storing embedding: {e.Message}");
         }
-
-        return true;
     }
 
     /// <summary>
@@ -294,10 +303,14 @@ public class RagService : IRagService
     /// </summary>
     /// <param name="keyword">The keyword to search for in the documents</param>
     /// <param name="distance">The distance threshold for the search</param>
+    /// <param name="database">The database to search</param>
+    /// <param name="viewName">The view to search</param>
+    /// <param name="columnName">The column to search</param>
     /// <returns>Session id for search results</returns>
-    public async Task<Guid?> GetRagDocuments(string keyword, int distance)
+    public async Task<RAGresult?> GetRagDocuments(string keyword, int distance, string database, 
+                                                  string viewName, string columnName)
     {
-        string sDistance = ((float)distance / 100.0f).ToString("0.00");
+        string sDistance = (distance / 100.0f).ToString("0.00");
 
         // generate embedding for the keyword
         // taskType "Represent this sentence for searching relevant passages"
@@ -309,40 +322,47 @@ public class RagService : IRagService
         string embeddingString = string.Join(",", embedding.SelectMany(x => x).Select(x => x.ToString()));
 
         // get the most similar embeddings from the database
-        string sql = $"WITH EmbeddingCTE AS (" +
-                    $"SELECT [{embeddingString}] AS EmbeddingString" +
-                    $") " +
-                    $"SELECT Id, FilePath, cosineDistance(Embedding, EmbeddingString) as Distance " +
-                    $"FROM ClickSphere.RAG, EmbeddingCTE " +
-                    $"WHERE cosineDistance(Embedding, EmbeddingString) < {sDistance} " +
-                    $"ORDER BY cosineDistance(Embedding, EmbeddingString) ASC LIMIT 1000";
+        string sql = $"SELECT Id, FilePath, cosineDistance(Embedding, [{embeddingString}]) as Distance " +
+                     $"FROM ClickSphere.RAG " +
+                     $"WHERE cosineDistance(Embedding, [{embeddingString}]) < {sDistance} " +
+                     $"AND Database = '{database}' AND TableName = '{viewName}' AND ColumnName = '{columnName}' " +
+                     $"ORDER BY 3 ASC LIMIT 1000";
 
         var result = await DbService!.ExecuteQueryDictionary(sql);
 
         if(result.Count == 0)
             return null;
         
-        // create session id
+        // create session id for retrieval of the results
         var sessionId = Guid.NewGuid();
 
-        // store output to temporary table
-        string sqlQuery = "";
+        // store output to RAGresult table
+        string[] columnNames = ["Id", "FilePath", "Distance", "SessionId"];
+
+        List<object[]?> data = [];
         foreach (var row in result)
         {
-            sqlQuery += @$"
-            INSERT INTO ClickSphere.RAGresult
-            ( Id,
-              FilePath, 
-              Distance, 
-              SessionId ) 
-            VALUES (
-             {row["Id"]},
-            '{row["FilePath"]}',
-             {row["Distance"]},
-            '{sessionId}');";
+            data.Add([row["Id"], row["FilePath"], Convert.ToSingle(row["Distance"]), sessionId]);
         }
-        await DbService.ExecuteNonQuery(sqlQuery);
 
-        return sessionId;
+        await DbService.ExecuteBulkInsert("ClickSphere", "RAGresult", columnNames, data);
+
+        return new RAGresult
+        {
+            SessionId = sessionId.ToString(),
+            ResultCount = result.Count
+        };
+    }
+
+    /// <summary>
+    /// Delete existing embeddings from the RAG table
+    /// </summary>
+    /// <param name="database">The database to delete the embeddings from</param>
+    /// <param name="tableName">The table to delete the embeddings from</param>
+    /// <param name="columnName">The column to delete the embeddings from</param>
+    public async Task DeleteRagEmbeddings(string database, string tableName, string columnName)
+    {
+        string sql = $"DELETE FROM ClickSphere.RAG WHERE Database = '{database}' AND TableName = '{tableName}' AND ColumnName = '{columnName}'";
+        await DbService!.ExecuteNonQuery(sql);
     }
 }
