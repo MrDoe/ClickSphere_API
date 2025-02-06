@@ -18,12 +18,12 @@ public class RagService : IRagService
     public RagService(IDbService dbService)
     {
         DbService = dbService;
-        AiConfig = GetAiConfig();
+        RAGConfig = dbService.GetAiConfig("RAGConfig");
         CreateRAGTable().Wait();
     }
 
     private readonly IDbService? DbService;
-    private readonly AiConfig? AiConfig;
+    private readonly AiConfig? RAGConfig;
     private readonly JsonSerializerOptions jsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -31,38 +31,6 @@ public class RagService : IRagService
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
-
-    /// <summary>
-    /// Get the system configuration
-    /// </summary>
-    /// <returns>The system configuration from the database</returns>
-    private AiConfig GetAiConfig()
-    {
-        string sql = "SELECT Key, Value FROM ClickSphere.Config WHERE Section = 'AiConfig' order by Key";
-        var result = DbService!.ExecuteQueryDictionary(sql).Result;
-
-        AiConfig config = new();
-
-        if (result.Count == 0)
-            return config;
-
-        foreach (var row in result)
-        {
-            if (row.ContainsKey("Key") && row.ContainsKey("Value"))
-            {
-                string? key = row["Key"]?.ToString();
-                string? value = row["Value"]?.ToString();
-
-                if (key == "OllamaUrl")
-                    config.OllamaUrl = value;
-                else if (key == "OllamaModel")
-                    config.OllamaModel = value;
-                else if (key == "SystemPrompt")
-                    config.SystemPrompt = value;
-            }
-        }
-        return config;
-    }
 
     /// <summary>
     /// Create the ClickSphere.RAG table with embeddings.
@@ -122,7 +90,7 @@ public class RagService : IRagService
     /// <param name="taskType">The task type (search_query, search_document, clustering, classification)</param>
     /// <returns>Embedding vector</returns>
     public async Task<List<List<float>>?> GenerateEmbedding(string input, string? taskType)
-    {
+    {        
         // create a new HttpClient and HttpClientHandler
         using HttpClientHandler handler = new()
         {
@@ -130,8 +98,8 @@ public class RagService : IRagService
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig!.OllamaUrl!),
-            Timeout = TimeSpan.FromSeconds(30)
+            BaseAddress = new Uri(RAGConfig!.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(60)
         };
 
         // Add an Accept header for JSON format
@@ -142,15 +110,16 @@ public class RagService : IRagService
         var requestOptions = new OllamaRequestOptions
         {
             //temperature = 0.1 // keep default value
+            //num_ctx = 4096
         };
 
-        // add task type to the input (required for some models)
-        if(!string.IsNullOrEmpty(taskType))
-            input = taskType + ": " + input;
-
+        // add system prompt for search_document task
+        if (taskType == "search_document")
+            input = RAGConfig.SystemPrompt + input;
+     
         var request = new OllamaEmbed
         {
-            model = "snowflake-arctic-embed2",
+            model = "bge-m3",
             input = input,
             truncate = true,
             options = requestOptions,
@@ -314,7 +283,7 @@ public class RagService : IRagService
 
         // generate embedding for the keyword
         // taskType "Represent this sentence for searching relevant passages"
-        var embedding = await GenerateEmbedding(keyword, "");
+        var embedding = await GenerateEmbedding(keyword, "search_document");
         if (embedding == null)
             return null;
 

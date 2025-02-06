@@ -9,20 +9,46 @@ namespace ClickSphere_API.Controllers;
 /// Interface to the Ollama AI service.
 /// </summary>
 [ApiController]
-public class AiController(IAiService AiService, IRagService RagService) : ControllerBase
+public class AiController(IAiService AiService, IDbService DbService, IRagService RagService) : ControllerBase
 {
     /// <summary>
     /// Ask the AI a question. Call the Ollama API
     /// </summary>
-    /// <param name="question" example="How can I create a new table?">The question to ask.</param>
+    /// <param name="request">The request to ask a question.</param>
     /// <returns>The answer to the question.</returns>
     [Authorize]
     [Route("/ask")]
     [HttpPost]
-    public async Task<string> Ask(string question)
+    public async Task<string> Ask([FromBody] TextRequest request)
     {
+        string question = request.Text;
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            throw new ArgumentException("Question is empty");
+        }
+
         // Call the Ollama API
         string response = await AiService.Ask(question);
+        return response;
+    }
+
+    /// <summary>
+    /// Use the AI to translate a text into English.
+    /// </summary>
+    /// <param name="request">The request to translate a text.</param>
+    /// <returns>The translated text.</returns>
+    [Route("/translate")]
+    [HttpPost]
+    public async Task<string> Translate([FromBody] TextRequest request)
+    {
+        string text = request.Text;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new ArgumentException("Text is empty");
+        }
+
+        // Call the Ollama API
+        string response = await AiService.Translate(text);
         return response;
     }
 
@@ -90,24 +116,32 @@ public class AiController(IAiService AiService, IRagService RagService) : Contro
     [Authorize]
     [Route("/getAiConfig")]
     [HttpGet]
-    public AiConfig GetAiConfig()
+    public AiConfig GetAiConfig(string type)
     {
         // Call the Ollama API
-        AiConfig response = AiService.GetAiConfig();
+        AiConfig response = DbService.GetAiConfig(type);
         return response;
     }
 
     /// <summary>
     /// Set the system configuration.
     /// </summary>
-    /// <param name="config">The system configuration.</param>
+    /// <param name="request">The request to set the system configuration.</param>
     /// <returns>The system configuration.</returns>
     [Authorize]
     [Route("/setAiConfig")]
     [HttpPost]
-    public async Task SetAiConfig(AiConfig config)
+    public async Task SetAiConfig(SetAIConfigRequest request)
     {
+        if (request.Config == null)
+        {
+            throw new ArgumentException("Config is empty");
+        }
+
+        string type = request.Type;
+        AiConfig config = request.Config;
+
         // Call the Ollama API
-        await AiService.SetAiConfig(config);
+        await DbService.SetAiConfig(type, config);
     }
 }

@@ -1,6 +1,7 @@
 using System.Configuration;
 using System.Reflection;
 using ClickSphere_API.Models;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.SignalR;
 using Octonica.ClickHouseClient;
 using Octonica.ClickHouseClient.Exceptions;
@@ -335,28 +336,39 @@ public class DbService : IDbService
         await ExecuteNonQuery(query);
 
         // check if AI Configuration exists
-        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'AiConfig'";
+        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'RAGConfig'";
         result = await ExecuteScalar(query);
 
         if (result is DBNull)
         {
-            await InsertAiConfig();
+            await InsertAiConfig("RAGConfig");
+        }
+
+        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'Text2SQLConfig'";
+        result = await ExecuteScalar(query);
+
+        if (result is DBNull)
+        {
+            await InsertAiConfig("Text2SQLConfig");
         }
     }
 
     /// <summary>
     /// Insert the AI Configuration into the ClickSphere database
     /// </summary>
-    private async Task InsertAiConfig()
+    /// <param name="type">The type of AI Configuration</param>
+    private async Task InsertAiConfig(string type)
     {
         // insert AI Configuration
-        string query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaUrl', 'http://localhost:11434', 'AiConfig')";
+        string query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaUrl', 'http://localhost:11434', '{type}')";
         await ExecuteNonQuery(query);
 
-        query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaModel', 'codegemma', 'AiConfig')";
-        await ExecuteNonQuery(query);
-
-        string systemPrompt =
+        string systemPrompt = "";
+        string modelName = "";
+        if (type == "Text2SQLConfig")
+        {
+            modelName = "gemma2:9b-instruct-q5_K_M";
+            systemPrompt =
 """
 # IDENTITY and PURPOSE
 
@@ -394,9 +406,41 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 # QUESTION
 
 """;
+        }
+        else if (type == "RAGConfig")
+        {
+            modelName = "bge-m3";
+            systemPrompt =
+"""
+# IDENTITY and PURPOSE
+
+You are a pathologist and expert for medical data, diagnoses, abbreviations and pathological findings in German and English.
+Your task is to find the best matching data sets for keywords or questions.
+
+# STEPS
+
+The following rules apply:
+- Take special care not to misinterpret the data and select the data that matches the question.
+- Search for medical synonyms and abbreviations of the keywords entered.
+- If the user searches for tumor tissue, the user should not be shown data with normal tissue.
+- If the user searches for *cancer* or *tumor*, *no* data of benign tumors or normal tissue should be displayed to the user.
+- Benign tumor tissue is also referred to as non-malignant or benign tumor tissue (no indication of malignancy).
+- Malignant tumor tissue (cancer) is also referred to as malignant or neoplastic tumor tissue.
+- Normal tissue is also referred to as tumor-free tissue.
+- If the user searches for a specific organ, no primary findings of another organ should be displayed to the user.
+
+# QUESTION
+
+Find the best matching records for the following question or keywords:
+"[KEYWORDS]""
+""";
+        }
         systemPrompt = systemPrompt.Replace("\n", "\\n").Replace("'", "''");
 
-        query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('SystemPrompt', '{systemPrompt}', 'AiConfig')";
+        query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaModel', '{modelName}', '{type}')";
+        await ExecuteNonQuery(query);
+
+        query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('SystemPrompt', '{systemPrompt}', '{type}')";
         await ExecuteNonQuery(query);
     }
 
@@ -407,5 +451,73 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
     {
         string query = "DROP DATABASE IF EXISTS ClickSphere";
         await ExecuteNonQuery(query);
+    }
+
+    /// <summary>
+    /// Get the system configuration
+    /// </summary>
+    /// <param name="type">The type of the configuration</param>
+    /// <returns>The system configuration from the database</returns>
+    public AiConfig GetAiConfig(string type)
+    {
+        string sql = $"SELECT Key, Value FROM ClickSphere.Config WHERE Section = '{type}' order by Key";
+        var result = ExecuteQueryDictionary(sql).Result;
+
+        AiConfig config = new();
+
+        if (result.Count == 0)
+            return config;
+
+        foreach (var row in result)
+        {
+            if (row.ContainsKey("Key") && row.ContainsKey("Value"))
+            {
+                string? key = row["Key"]?.ToString();
+                string? value = row["Value"]?.ToString();
+
+                if (key == "OllamaUrl")
+                    config.OllamaUrl = value;
+                else if (key == "OllamaModel")
+                    config.OllamaModel = value;
+                else if (key == "SystemPrompt")
+                    config.SystemPrompt = value;
+            }
+        }
+        return config;
+    }
+
+    /// <summary>
+    /// Set the system configuration
+    /// </summary>
+    /// <param name="config">The system configuration to set</param>
+    /// <param name="type">The type of the configuration (RAG, Text2SQL)</param>
+    /// <returns>True if the configuration was set successfully</returns>
+    public async Task SetAiConfig(string type, AiConfig config)
+    {
+        // escape single quotes in input string
+        config.SystemPrompt = config.SystemPrompt?.Replace("'", "''");
+
+        try
+        {
+            // update ClickSphere.Config table (KEY, VALUE, SECTION)
+            string sql = $"ALTER TABLE ClickSphere.Config " +
+                         $"UPDATE Value = '{config.OllamaUrl}' " +
+                         $"WHERE Key = 'OllamaUrl' AND Section = '{type}'";
+            await ExecuteNonQuery(sql);
+
+            sql = $"ALTER TABLE ClickSphere.Config " +
+                  $"UPDATE Value = '{config.OllamaModel}' " +
+                  $"WHERE Key = 'OllamaModel' AND Section = '{type}'";
+            await ExecuteNonQuery(sql);
+
+            sql = $"ALTER TABLE ClickSphere.Config " +
+                  $"UPDATE Value = '{config.SystemPrompt}' " +
+                  $"WHERE Key = 'SystemPrompt' AND Section = '{type}'";
+            await ExecuteNonQuery(sql);
+        }
+        catch (Exception e)
+        {
+            throw new Exception($"Error updating AiConfig: {e.Message}");
+        }
     }
 }

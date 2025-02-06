@@ -41,15 +41,9 @@ public interface IAiService
     Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table);
 
     /// <summary>
-    /// Sets the AI configuration.
+    /// Translates the text to English.
     /// </summary>
-    /// <param name="config">The AI configuration to set.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    Task SetAiConfig(AiConfig config);
-
-    /// <summary>
-    /// Gets the AI configuration.
-    /// </summary>
-    /// <returns>The AI configuration.</returns>
-    AiConfig GetAiConfig();
+    /// <param name="text">The text to translate.</param>
+    /// <returns>The translated text.</returns>
+    Task<string> Translate(string text);
 }
