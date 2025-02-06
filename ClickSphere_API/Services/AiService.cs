@@ -21,7 +21,7 @@ public partial class AiService : IAiService
         RagService = ragService;
         DbService = dbService;
         ViewService = viewService;
-        Text2SQLConfig = DbService.GetAiConfig("Text2SQL");
+        Text2SQLConfig = DbService.GetAiConfig("Text2SQLConfig");
     }
 
     private IDbService? DbService { get; set; }
