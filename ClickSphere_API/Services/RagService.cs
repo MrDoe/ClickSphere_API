@@ -123,7 +123,7 @@ public class RagService : IRagService
             input = input,
             truncate = true,
             options = requestOptions,
-            keep_alive = "5d"
+            keep_alive = "-1"
         };
 
         string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
