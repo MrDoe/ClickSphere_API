@@ -185,7 +185,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             bool success = await UpdateViewColumns(database, viewId);
 
             if (!success)
-                return new List<ViewColumns>();
+                return [];
 
             // load data from ViewColumns table
             return await LoadViewColumns(database, viewId);
@@ -200,7 +200,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
                 bool success = await UpdateViewColumns(database, viewId);
 
                 if (!success)
-                    return new List<ViewColumns>();
+                    return [];
 
                 // load data from ViewColumns table again
                 columns = await LoadViewColumns(database, viewId);
