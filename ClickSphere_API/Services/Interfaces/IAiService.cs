@@ -1,5 +1,4 @@
-using ClickSphere_API.Models;
-
+using ClickSphere_API.Tools;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -46,4 +45,24 @@ public interface IAiService
     /// <param name="text">The text to translate.</param>
     /// <returns>The translated text.</returns>
     Task<string> Translate(string text);
+
+    /// <summary>
+    /// Get models from the Ollama API.
+    /// </summary>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    IList<string> GetModels(CancellationToken token = default);
+    
+    /// <summary>
+    /// Get models from the Ollama API.
+    /// </summary>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    Task<IList<string>> GetModelsAsync(CancellationToken token = default);
+
+    /// <summary>
+    /// Pull a model from the Ollama API.
+    /// </summary>
+    /// <param name="model">The model to pull.</param>
+    Task<Result> PullModelAsync(string model);
 }

@@ -292,6 +292,98 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
     }
 
     /// <summary>
+    /// Pull a model from the Ollama API.
+    /// </summary>
+    /// <param name="model">The model to pull.</param>
+    /// <returns>The result of the operation.</returns>
+    public async Task<Result> PullModelAsync(string model)
+    {
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+        HttpResponseMessage? response;
+        try
+        {
+            var requestBody = new
+            {
+                name = model,
+                insecure = false,
+                stream = true
+            };
+
+            response = await client.PostAsync(
+                "api/pull",
+                new StringContent(JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json"),
+                CancellationToken.None).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                using var streamContent = await response.Content.ReadAsStreamAsync();
+                using var reader = new StreamReader(streamContent);
+
+                string? line;
+                DateTime lastNotificationTime = DateTime.MinValue;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        var statusUpdate = JsonSerializer.Deserialize<Dictionary<string, object>?>(line);
+                        if (statusUpdate == null)
+                            continue;
+
+                        string statusMessage = statusUpdate["status"]?.ToString() ?? "Model pull in progress";
+
+                        if (statusUpdate.TryGetValue("completed", out object? completed) &&
+                           statusUpdate.TryGetValue("total", out object? total))
+                        {
+                            statusMessage += $" ({completed}/{total})";
+                        }
+
+                        // Check if 5 seconds have passed since the last notification
+                        if ((DateTime.Now - lastNotificationTime).TotalSeconds >= 5)
+                        {
+                            Console.WriteLine(statusMessage);
+                            lastNotificationTime = DateTime.Now;
+                        }
+
+                        if (statusUpdate!.ContainsKey("completed") == true)
+                        {
+                            if (statusUpdate["completed"]?.ToString() == statusUpdate["total"]?.ToString())
+                            {
+                                break;
+                            }
+                        }
+
+                        // handle errors
+                        if (statusUpdate!.ContainsKey("error"))
+                        {
+                            return new Result(false, "Model pull failed. Error: " + statusUpdate["error"]);
+                        }
+                    }
+                }
+                return new Result(true, "Model pull completed.");
+            }
+            else
+            {
+                return new Result(false, "Model pull failed with status: " + response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            return new Result(false, "Model pull failed. Error: " + ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Get first 10 rows of the table and ask AI to generate a list of possible questions
     /// </summary>
     /// <param name="database">The database to get the table from</param>

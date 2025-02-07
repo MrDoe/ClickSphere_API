@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Models;
+using ClickSphere_API.Tools;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
@@ -11,6 +12,33 @@ namespace ClickSphere_API.Controllers;
 [ApiController]
 public class AiController(IAiService AiService, IDbService DbService, IRagService RagService) : ControllerBase
 {
+    /// <summary>
+    /// Get available models from Ollama
+    /// </summary>
+    /// <returns>List of available models</returns>
+    [Route("/getModels")]
+    [HttpGet]
+    public async Task<IList<string>> GetModels()
+    {
+        // Call the Ollama API
+        IList<string> response = await AiService.GetModelsAsync();
+        return response;
+    }
+
+    /// <summary>
+    /// Pull a specific model from Ollama
+    /// </summary>
+    /// <param name="model">The model to pull</param>
+    /// <returns>The model</returns>
+    [Route("/pullModel")]
+    [HttpGet]
+    public async Task<string> PullModel(string model)
+    {
+        // Call the Ollama API
+        Result response = await AiService.PullModelAsync(model);
+        return response.Output;
+    }
+
     /// <summary>
     /// Ask the AI a question. Call the Ollama API
     /// </summary>
