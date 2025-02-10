@@ -197,6 +197,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
 
             if (columns.Count == 0)
             {
+                // regenerate columns if not found
                 bool success = await UpdateViewColumns(database, viewId);
 
                 if (!success)
@@ -310,6 +311,9 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     /// <returns>The distinct values of the column</returns>
     public async Task<IList<string>> GetDistinctValues(string database, string viewId, string column)
     {
+        if(string.IsNullOrEmpty(database) || string.IsNullOrEmpty(viewId) || string.IsNullOrEmpty(column))
+            return [];
+        
         return await _dbService.ExecuteQuery($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 50") ?? [];
     }
 

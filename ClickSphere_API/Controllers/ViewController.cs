@@ -146,6 +146,11 @@ public class ViewController(IApiViewService viewServices) : ControllerBase
     [Route("/getDistinctValues")]
     public async Task<IList<string>> GetDistinctValues(string database, string viewId, string columnName)
     {
+        if(database == null || viewId == null || columnName == null)
+        {
+            throw new ArgumentNullException("database, viewId or columnName is null");
+        }
+        
         return await ViewServices.GetDistinctValues(database, viewId, columnName);
     }
 }
