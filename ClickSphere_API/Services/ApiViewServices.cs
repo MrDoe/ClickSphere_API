@@ -375,7 +375,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
                 "tinyint" => "UInt8",
                 "smallint" => "Int16",
                 "int" => "Int32",
-                "bigint" => "Int64",
+                "bigint" => "UInt64",
                 "float" => "Float32",
                 "double" => "Float64",
                 "varchar" => "String",

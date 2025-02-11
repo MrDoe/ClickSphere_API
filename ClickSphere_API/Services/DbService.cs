@@ -72,6 +72,9 @@ public class DbService : IDbService
         if (_connString == null)
             throw new Exception("ClickHouse connection string is not valid");
 
+        // increate timeout to 5 minutes
+        _connString.CommandTimeout = 300;
+        
         return new ClickHouseConnection(_connString.ConnectionString);
     }
 
