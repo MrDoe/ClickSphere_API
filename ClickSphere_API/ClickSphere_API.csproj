@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Ardalis.GuardClauses" Version="5.0.0" />
+    <PackageReference Include="System.Data.Odbc" Version="9.0.2" />
     <ProjectReference Include="..\ClickHouseClient\src\Octonica.ClickHouseClient\Octonica.ClickHouseClient.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.1" />

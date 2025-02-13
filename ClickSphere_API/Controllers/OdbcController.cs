@@ -35,13 +35,25 @@ public class OdbcController(IApiViewService viewService) : ControllerBase
     /// <returns>The view definition.</returns>
     [HttpGet]
     [Route("/odbc/importView")]
-    public async Task<string> ImportViewFromODBC(string view, bool dropExisting = false)
+    public async Task<IResult> ImportViewFromODBC(string view, bool dropExisting = false)
     {
         if(string.IsNullOrEmpty(view))
         {
-            return "Invalid request";
+            return Results.BadRequest("View name is empty");
         }
-        return await _viewService.ImportViewFromODBC(view, dropExisting);
+        
+        IResult result;
+        
+        try
+        {
+            result = await _viewService.ImportViewFromODBC(view, dropExisting);
+        }
+        catch (Exception e)
+        {
+            return Results.InternalServerError(e.Message);
+        }
+
+        return result;
     }
 
     /// <summary>

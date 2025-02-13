@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Tools;
-
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -24,11 +23,11 @@ public partial class AiService : IAiService
         Text2SQLConfig = DbService.GetAiConfig("Text2SQLConfig");
     }
 
-    private IDbService? DbService { get; set; }
-    private IApiViewService? ViewService { get; set; }
+    private IDbService DbService { get; set; } = default!;
+    private IApiViewService ViewService { get; set; } = default!;
+    private AiConfig Text2SQLConfig { get; set; } = default!;
+    private IRagService RagService { get; set; } = default!;
     private readonly string OllamaApiPath = "api/generate";
-    private AiConfig Text2SQLConfig { get; set; }
-    private IRagService RagService { get; set; }
     private readonly string promptAddition = " Keep it short and as simple as possible.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
@@ -69,7 +68,7 @@ Do not include any file links or URLs.
 Output plain text only without any formatting.
 Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
 """;
-    
+
         OllamaRequestOptions options = new()
         {
             temperature = 0.1,
@@ -271,7 +270,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
                     responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
 
-                if(useEmbeddings)
+                if (useEmbeddings)
                 {
                     // generate embedding for question and query
                     var embedding = await RagService.GenerateEmbedding($"{question}\n\nSQL_QUERY: {responseText}", "search_document");
@@ -602,27 +601,34 @@ Output a short description only, no explanations.
             mediaType);
 
         // Send POST request to the Ollama API
-        HttpResponseMessage response = await client.PostAsync(OllamaApiPath, jsonContent);
-
-        if (response.IsSuccessStatusCode)
+        try
         {
-            // Read the response object
-            string jsonResponse = await response.Content.ReadAsStringAsync();
-            if (jsonResponse == null)
-                return "";
-
-            var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
-
-            // Return the answer from the json object
-            if (jsonObject!.response != null)
+            var response = await client.PostAsync(OllamaApiPath, jsonContent);
+            if (response.IsSuccessStatusCode)
             {
-                return jsonObject.response.Trim();
+                // Read the response object
+                string jsonResponse = await response.Content.ReadAsStringAsync();
+                if (jsonResponse == null)
+                    return "";
+
+                var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
+
+                // Return the answer from the json object
+                if (jsonObject!.response != null)
+                {
+                    return jsonObject.response.Trim();
+                }
+                return "";
             }
-            return "";
+            else
+            {
+                throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+            }
         }
-        else
+        catch (Exception e)
         {
-            throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+            Console.WriteLine(e.Message);
+            return e.Message;
         }
     }
 
