@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Tools;
-
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -21,14 +20,14 @@ public partial class AiService : IAiService
         RagService = ragService;
         DbService = dbService;
         ViewService = viewService;
-        AiConfig = GetAiConfig();
+        Text2SQLConfig = DbService.GetAiConfig("Text2SQLConfig");
     }
 
-    private IDbService? DbService { get; set; }
-    private IApiViewService? ViewService { get; set; }
+    private IDbService DbService { get; set; } = default!;
+    private IApiViewService ViewService { get; set; } = default!;
+    private AiConfig Text2SQLConfig { get; set; } = default!;
+    private IRagService RagService { get; set; } = default!;
     private readonly string OllamaApiPath = "api/generate";
-    private AiConfig AiConfig { get; set; }
-    private IRagService RagService { get; set; }
     private readonly string promptAddition = " Keep it short and as simple as possible.";
     private readonly JsonSerializerOptions jsonOptions = new()
     {
@@ -51,7 +50,7 @@ public partial class AiService : IAiService
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -69,7 +68,7 @@ Do not include any file links or URLs.
 Output plain text only without any formatting.
 Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
 """;
-    
+
         OllamaRequestOptions options = new()
         {
             temperature = 0.1,
@@ -110,6 +109,70 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
     }
 
     /// <summary>
+    /// Translate a text into English.
+    /// </summary>
+    /// <param name="text">The text to translate.</param>
+    /// <returns>The translated text.</returns>
+    public async Task<string> Translate(string text)
+    {
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(120)
+        };
+
+        // Add an Accept header for JSON format
+        client.DefaultRequestHeaders.Accept.Clear();
+        var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
+        client.DefaultRequestHeaders.Accept.Add(mediaType);
+
+        // Create the JSON string for the request
+        var requestOptions = new OllamaRequestOptions
+        {
+            temperature = 0.1
+        };
+
+        var request = new OllamaRequest
+        {
+            model = "gemma2:9b-instruct-q5_K_M",
+            system = @"You are an expert for translations of medical terms and diagnoses from German to English.
+                       Be sure to use the right terminology and be precise.
+                       Translate the user's text into English.
+                       Output the translated text only, no explanations.",
+            prompt = text,
+            stream = false
+        };
+
+        string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
+
+        var jsonContent = new StringContent(
+            jsonRequest,
+            Encoding.UTF8,
+            mediaType);
+
+        // Send POST request to the Ollama API
+        HttpResponseMessage response = await client.PostAsync(OllamaApiPath, jsonContent);
+
+        if (response.IsSuccessStatusCode)
+        {
+            // Read the response as json object
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
+
+            // Return the answer from the json object
+            return jsonObject?.response ?? "";
+        }
+        else
+        {
+            throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+        }
+    }
+
+    /// <summary>
     /// Generate a SQL query based on a question and a table
     /// </summary>
     /// <param name="question">The question to convert into a SQL query</param>
@@ -126,7 +189,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
             return "ERROR: Invalid table name!";
 
         // add table definition to the system prompt
-        string systemPrompt = AiConfig.SystemPrompt!;
+        string systemPrompt = Text2SQLConfig.SystemPrompt!;
         systemPrompt = systemPrompt.Replace("[_TABLE_NAME_]", $"{database}.{table}");
         systemPrompt = systemPrompt.Replace("[_TABLE_SCHEMA_]", tableDefinition);
 
@@ -137,7 +200,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
 
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -154,7 +217,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
 
         var request = new OllamaRequest
         {
-            model = AiConfig.OllamaModel!,
+            model = Text2SQLConfig.OllamaModel!,
             system = systemPrompt,
             prompt = question + promptAddition,
             stream = false
@@ -207,7 +270,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
                     responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
 
-                if(useEmbeddings)
+                if (useEmbeddings)
                 {
                     // generate embedding for question and query
                     var embedding = await RagService.GenerateEmbedding($"{question}\n\nSQL_QUERY: {responseText}", "search_document");
@@ -224,6 +287,98 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
         else
         {
             throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+        }
+    }
+
+    /// <summary>
+    /// Pull a model from the Ollama API.
+    /// </summary>
+    /// <param name="model">The model to pull.</param>
+    /// <returns>The result of the operation.</returns>
+    public async Task<Result> PullModelAsync(string model)
+    {
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+        HttpResponseMessage? response;
+        try
+        {
+            var requestBody = new
+            {
+                name = model,
+                insecure = false,
+                stream = true
+            };
+
+            response = await client.PostAsync(
+                "api/pull",
+                new StringContent(JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json"),
+                CancellationToken.None).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                using var streamContent = await response.Content.ReadAsStreamAsync();
+                using var reader = new StreamReader(streamContent);
+
+                string? line;
+                DateTime lastNotificationTime = DateTime.MinValue;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        var statusUpdate = JsonSerializer.Deserialize<Dictionary<string, object>?>(line);
+                        if (statusUpdate == null)
+                            continue;
+
+                        string statusMessage = statusUpdate["status"]?.ToString() ?? "Model pull in progress";
+
+                        if (statusUpdate.TryGetValue("completed", out object? completed) &&
+                           statusUpdate.TryGetValue("total", out object? total))
+                        {
+                            statusMessage += $" ({completed}/{total})";
+                        }
+
+                        // Check if 5 seconds have passed since the last notification
+                        if ((DateTime.Now - lastNotificationTime).TotalSeconds >= 5)
+                        {
+                            Console.WriteLine(statusMessage);
+                            lastNotificationTime = DateTime.Now;
+                        }
+
+                        if (statusUpdate!.ContainsKey("completed") == true)
+                        {
+                            if (statusUpdate["completed"]?.ToString() == statusUpdate["total"]?.ToString())
+                            {
+                                break;
+                            }
+                        }
+
+                        // handle errors
+                        if (statusUpdate!.ContainsKey("error"))
+                        {
+                            return new Result(false, "Model pull failed. Error: " + statusUpdate["error"]);
+                        }
+                    }
+                }
+                return new Result(true, "Model pull completed.");
+            }
+            else
+            {
+                return new Result(false, "Model pull failed with status: " + response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            return new Result(false, "Model pull failed. Error: " + ex.Message);
         }
     }
 
@@ -304,7 +459,7 @@ Precisely follow the instructions given to you.
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(60)
         };
 
@@ -415,7 +570,7 @@ Output a short description only, no explanations.
 
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -446,27 +601,34 @@ Output a short description only, no explanations.
             mediaType);
 
         // Send POST request to the Ollama API
-        HttpResponseMessage response = await client.PostAsync(OllamaApiPath, jsonContent);
-
-        if (response.IsSuccessStatusCode)
+        try
         {
-            // Read the response object
-            string jsonResponse = await response.Content.ReadAsStringAsync();
-            if (jsonResponse == null)
-                return "";
-
-            var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
-
-            // Return the answer from the json object
-            if (jsonObject!.response != null)
+            var response = await client.PostAsync(OllamaApiPath, jsonContent);
+            if (response.IsSuccessStatusCode)
             {
-                return jsonObject.response.Trim();
+                // Read the response object
+                string jsonResponse = await response.Content.ReadAsStringAsync();
+                if (jsonResponse == null)
+                    return "";
+
+                var jsonObject = JsonSerializer.Deserialize<OllamaResponse>(jsonResponse, jsonOptions);
+
+                // Return the answer from the json object
+                if (jsonObject!.response != null)
+                {
+                    return jsonObject.response.Trim();
+                }
+                return "";
             }
-            return "";
+            else
+            {
+                throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+            }
         }
-        else
+        catch (Exception e)
         {
-            throw new Exception($"Error calling Ollama API: {response.StatusCode}");
+            Console.WriteLine(e.Message);
+            return e.Message;
         }
     }
 
@@ -493,66 +655,6 @@ Output a short description only, no explanations.
     }
 
     /// <summary>
-    /// Get the system configuration
-    /// </summary>
-    /// <returns>The system configuration from the database</returns>
-    public AiConfig GetAiConfig()
-    {
-        string sql = "SELECT Key, Value FROM ClickSphere.Config WHERE Section = 'AiConfig' order by Key";
-        var result = DbService!.ExecuteQueryDictionary(sql).Result;
-
-        AiConfig config = new();
-
-        if (result.Count == 0)
-            return config;
-
-        foreach (var row in result)
-        {
-            if (row.ContainsKey("Key") && row.ContainsKey("Value"))
-            {
-                string? key = row["Key"]?.ToString();
-                string? value = row["Value"]?.ToString();
-
-                if (key == "OllamaUrl")
-                    config.OllamaUrl = value;
-                else if (key == "OllamaModel")
-                    config.OllamaModel = value;
-                else if (key == "SystemPrompt")
-                    config.SystemPrompt = value;
-            }
-        }
-        return config;
-    }
-
-    /// <summary>
-    /// Set the system configuration
-    /// </summary>
-    /// <param name="config">The system configuration to set</param>
-    /// <returns>True if the configuration was set successfully</returns>
-    public async Task SetAiConfig(AiConfig config)
-    {
-        // escape single quotes in the strings
-        config.SystemPrompt = config.SystemPrompt?.Replace("'", "''");
-
-        try
-        {
-            // update ClickSphere.Config table (KEY, VALUE, SECTION)
-            string sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaUrl}' WHERE Key = 'OllamaUrl' AND Section = 'AiConfig'";
-            await DbService!.ExecuteNonQuery(sql);
-
-            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.OllamaModel}' WHERE Key = 'OllamaModel' AND Section = 'AiConfig'";
-            await DbService!.ExecuteNonQuery(sql);
-
-            sql = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{config.SystemPrompt}' WHERE Key = 'SystemPrompt' AND Section = 'AiConfig'";
-            await DbService!.ExecuteNonQuery(sql);
-        }
-        catch (Exception e)
-        {
-            throw new Exception($"Error updating AiConfig: {e.Message}");
-        }
-    }
-
-    /// <summary>
     /// Get models from the Ollama API.
     /// </summary>
     /// <param name="token">The cancellation token.</param>
@@ -575,7 +677,7 @@ Output a short description only, no explanations.
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(15)
         };
 
@@ -633,7 +735,7 @@ Output a short description only, no explanations.
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(15)
         };
 
@@ -726,7 +828,7 @@ Output a short description only, no explanations.
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(AiConfig.OllamaUrl!),
+            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(15)
         };
 

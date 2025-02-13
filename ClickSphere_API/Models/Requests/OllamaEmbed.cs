@@ -8,7 +8,7 @@ public class OllamaEmbed
     /// <summary>
     /// name of the model to generate embeddings from.
     /// </summary>
-    public string model { get; set; } = "snowflake-arctic-embed2";
+    public string model { get; set; } = "";
 
     /// <summary>
     /// text or list of text to generate embeddings for.

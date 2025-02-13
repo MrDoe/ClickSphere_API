@@ -1,5 +1,4 @@
-using ClickSphere_API.Models;
-
+using ClickSphere_API.Tools;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -41,15 +40,29 @@ public interface IAiService
     Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table);
 
     /// <summary>
-    /// Sets the AI configuration.
+    /// Translates the text to English.
     /// </summary>
-    /// <param name="config">The AI configuration to set.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    Task SetAiConfig(AiConfig config);
+    /// <param name="text">The text to translate.</param>
+    /// <returns>The translated text.</returns>
+    Task<string> Translate(string text);
 
     /// <summary>
-    /// Gets the AI configuration.
+    /// Get models from the Ollama API.
     /// </summary>
-    /// <returns>The AI configuration.</returns>
-    AiConfig GetAiConfig();
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    IList<string> GetModels(CancellationToken token = default);
+    
+    /// <summary>
+    /// Get models from the Ollama API.
+    /// </summary>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>The models.</returns>
+    Task<IList<string>> GetModelsAsync(CancellationToken token = default);
+
+    /// <summary>
+    /// Pull a model from the Ollama API.
+    /// </summary>
+    /// <param name="model">The model to pull.</param>
+    Task<Result> PullModelAsync(string model);
 }

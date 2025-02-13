@@ -1,5 +1,6 @@
 using System.Text;
 using ClickSphere_API.Models;
+using System.Data.Odbc;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -149,11 +150,11 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             view.Description = view.Description!.Replace("'", "''");
             view.Questions = view.Questions!.Replace("'", "''");
 
-            string updateQuery = $"ALTER TABLE ClickSphere.Views " + 
-                                 $"UPDATE Name = '{view.Name}', " + 
-                                 $"Description = '{view.Description}', " + 
+            string updateQuery = $"ALTER TABLE ClickSphere.Views " +
+                                 $"UPDATE Name = '{view.Name}', " +
+                                 $"Description = '{view.Description}', " +
                                  $"Type = '{view.Type}', " +
-                                 $"Questions = '{view.Questions}' " + 
+                                 $"Questions = '{view.Questions}' " +
                                  $"WHERE Id = '{view.Id}';";
             int updateResult = await _dbService.ExecuteNonQuery(updateQuery);
             if (updateResult < 0)
@@ -185,7 +186,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             bool success = await UpdateViewColumns(database, viewId);
 
             if (!success)
-                return new List<ViewColumns>();
+                return [];
 
             // load data from ViewColumns table
             return await LoadViewColumns(database, viewId);
@@ -197,10 +198,11 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
 
             if (columns.Count == 0)
             {
+                // regenerate columns if not found
                 bool success = await UpdateViewColumns(database, viewId);
 
                 if (!success)
-                    return new List<ViewColumns>();
+                    return [];
 
                 // load data from ViewColumns table again
                 columns = await LoadViewColumns(database, viewId);
@@ -227,16 +229,19 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         {
             string? controlType = col["Data Type"] switch
             {
-                "String" => "TextBox",
+                "String" or "Nullable(String)" => "TextBox",
                 "UInt8" or "UInt16" or "UInt32" or "UInt64" or "Int8" or "Int16" or "Int32" or "Int64" => "Numeric",
+                "Nullable(UInt8)" or "Nullable(UInt16)" or "Nullable(UInt32)" or "Nullable(UInt64)" or "Nullable(Int8)" or "Nullable(Int16)" or "Nullable(Int32)" or "Nullable(Int64)" => "Numeric",
                 "Float32" or "Float64" => "Numeric",
+                "Nullable(Float32)" or "Nullable(Float64)" => "Numeric",
                 "DateTime" or "DateTime64(3)" => "DateTime",
+                "Nullable(DateTime)" or "Nullable(DateTime64(3))" => "DateTime",
                 _ => "TextBox",
             };
 
             // escape single quotes from data type
             string dataType = col["Data Type"].ToString()?.Replace("'", "''") ?? "";
-            
+
             string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter) " +
                                  $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{dataType}','{controlType}',{sorter});";
 
@@ -280,9 +285,9 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     /// <returns>The result of the column update</returns>
     public async Task<IResult> UpdateViewColumn(ViewColumns column)
     {
-        if(column == null)
+        if (column == null)
             return Results.BadRequest("Column is null");
-        
+
         // escape single quotes
         string placeholder = column.Placeholder!.Replace("'", "''");
         string description = column.Description!.Replace("'", "''");
@@ -310,26 +315,29 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     /// <returns>The distinct values of the column</returns>
     public async Task<IList<string>> GetDistinctValues(string database, string viewId, string column)
     {
+        if (string.IsNullOrEmpty(database) || string.IsNullOrEmpty(viewId) || string.IsNullOrEmpty(column))
+            return [];
+
         return await _dbService.ExecuteQuery($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 50") ?? [];
     }
 
-     /// <summary>
+    /// <summary>
     /// Import view from ODBC table into ClickHouse.
     /// </summary>
     /// <param name="view">The view name</param>
     /// <param name="dropExisting">Whether to drop the existing view</param>
     /// <returns>ok if the view was imported successfully, error message otherwise</returns>
-    public async Task<string> ImportViewFromODBC(string view, bool dropExisting = false)
+    public async Task<IResult> ImportViewFromODBC(string view, bool dropExisting = false)
     {
         if (string.IsNullOrEmpty(view))
         {
-            return "Invalid request";
+            return Results.BadRequest("Invalid request");
         }
 
         // check if system table
-        if(view == "Views" || view == "ViewColumns" || view == "Embeddings" || view == "Config" || view == "Users")
+        if (view == "Views" || view == "ViewColumns" || view == "Embeddings" || view == "Config" || view == "Users")
         {
-            return "System tables cannot be imported";
+            return Results.BadRequest("Cannot import system tables");
         }
 
         // We need this view on our server:
@@ -343,25 +351,25 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         //     IS_NULLABLE
         // FROM 
         //     INFORMATION_SCHEMA.COLUMNS
-    
+
         string odbcConnectionString = $"DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};";
-        
+
         // get columns from ODBC view
         IList<Dictionary<string, object>> columns;
         string query =
-         "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE " + 
-        $"FROM odbc('{odbcConnectionString}', 'dbo', 'V_VIEW_COLUMNS') " +
+         "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE " +
+        $"FROM odbc('{odbcConnectionString}', '', 'V_VIEW_COLUMNS') " +
         $"WHERE TABLE_NAME = '{view}';";
 
         try
         {
-            columns = await _dbService.ExecuteQueryDictionary(query);        
+            columns = await _dbService.ExecuteQueryDictionary(query);
         }
         catch (Exception e)
         {
-            return e.Message;
+            return Results.BadRequest(e.Message);
         }
-    
+
         // convert from MS SQL to ClickHouse data types
         foreach (var column in columns)
         {
@@ -371,7 +379,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
                 "tinyint" => "UInt8",
                 "smallint" => "Int16",
                 "int" => "Int32",
-                "bigint" => "Int64",
+                "bigint" => "UInt64",
                 "float" => "Float32",
                 "double" => "Float64",
                 "varchar" => "String",
@@ -405,9 +413,9 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
                 "smalldatetime" => "DateTime64",
                 _ => "String"
             };
-            
+
             // add length to data type
-            if (!string.IsNullOrEmpty(column["CHARACTER_MAXIMUM_LENGTH"].ToString()) && 
+            if (!string.IsNullOrEmpty(column["CHARACTER_MAXIMUM_LENGTH"].ToString()) &&
                 chDataType != "String" && chDataType != "UUID" && chDataType != "DateTime64")
             {
                 chDataType += $"({column["CHARACTER_MAXIMUM_LENGTH"]})";
@@ -432,11 +440,11 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         {
             query += $"`{column["COLUMN_NAME"]}` {column["DATA_TYPE"]} ";
 
-            if(column["IS_NULLABLE"].ToString() == "YES"  && column["COLUMN_NAME"].ToString()?.ToUpper() != "ID")
+            if (column["IS_NULLABLE"].ToString() == "YES" && column["COLUMN_NAME"].ToString()?.ToUpper() != "ID")
                 query += "NULL DEFAULT NULL";
             else
                 query += "NOT NULL";
-            
+
             // add comma if not last column
             if (columns.IndexOf(column) < columns.Count - 1)
                 query += ", ";
@@ -445,13 +453,23 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         // each view has an ID column
         query += ") ENGINE = MergeTree() ORDER BY ID";
 
-        try 
+        try
         {
             await _dbService.ExecuteNonQuery(query);
         }
         catch (Exception e)
         {
-            return e.Message;
+            return Results.BadRequest(e.Message);
+        }
+
+        // call ReplaceUmlautsInView procedure on ODBC server
+        try
+        {
+            await ExecuteOdbc($"EXEC ReplaceUmlautsInView '{view}'");
+        }
+        catch (Exception e)
+        {
+            return Results.BadRequest(e.Message);
         }
 
         // fill table with data
@@ -464,7 +482,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         }
         catch (Exception e)
         {
-            return e.Message;
+            return Results.BadRequest(e.Message);
         }
 
         // add view configuration to ClickSphere.Views
@@ -478,8 +496,8 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             Type = "V",
             Questions = ""
         });
-        
-        return "ok";
+
+        return Results.Ok();
     }
 
     /// <summary>
@@ -505,5 +523,14 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     {
         string query = $"SELECT VIEW_NAME FROM odbc('DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};', '', 'VIEW_SETTINGS');";
         return await _dbService.ExecuteQuery(query);
+    }
+
+    private async Task<int> ExecuteOdbc(string sql)
+    {
+        string connectionString = $"DSN={ODBC_DSN};UID={ODBC_User};PWD={ODBC_Password};";
+        using OdbcConnection connection = new(connectionString);
+        connection.Open();
+        using OdbcCommand command = new(sql, connection);
+        return await command.ExecuteNonQueryAsync();
     }
 }

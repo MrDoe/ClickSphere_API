@@ -73,6 +73,22 @@ public class UserController(IApiUserService userService) : ControllerBase
             return Results.BadRequest("Username and password are required");
 
         Result result = await _userService.CreateUser(user.Username, user.Password);
+        if (!result.IsSuccessful)
+            return Results.BadRequest(result.Output);
+        
+        result = await _userService.UpdateUser(new UserConfig
+        {
+            Id = Guid.Parse(result.Output),
+            Username = user.Username,
+            Email = user.Email,
+            LastName = user.LastName,
+            FirstName = user.FirstName,
+            Phone = user.Phone,
+            Department = user.Department,
+            LDAP_User = user.LDAP_User,
+            Role = "User"
+        });
+
         if (result.IsSuccessful)
             return Results.Ok();
         else
@@ -91,6 +107,8 @@ public class UserController(IApiUserService userService) : ControllerBase
     {
         if (string.IsNullOrEmpty(username))
             return Results.BadRequest("Username is required");
+        if (username == "default")
+            return Results.BadRequest("Default user cannot be deleted!");
 
         Result result = await _userService.DeleteUser(username);
         if (result.IsSuccessful)

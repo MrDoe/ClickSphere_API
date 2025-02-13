@@ -1,3 +1,5 @@
+using ClickSphere_API.Models;
+
 namespace ClickSphere_API.Services;
 /// <summary>
 /// Represents a database service.
@@ -64,4 +66,19 @@ public interface IDbService
     /// <param name="columnNames">The column names.</param>
     /// <param name="data">The data to insert.</param>
     Task ExecuteBulkInsert(string database, string tableName, string[] columnNames, IReadOnlyList<object[]?> data);
+
+    /// <summary>
+    /// Get the system configuration
+    /// </summary>
+    /// <param name="type">The type of the configuration</param>
+    /// <returns>The system configuration from the database</returns>
+    AiConfig GetAiConfig(string type);
+    
+    /// <summary>
+    /// Set the system configuration
+    /// </summary>
+    /// <param name="config">The system configuration to set</param>
+    /// <param name="type">The type of the configuration (RAG, Text2SQL)</param>
+    /// <returns>True if the configuration was set successfully</returns>
+    Task SetAiConfig(string type, AiConfig config);
 }

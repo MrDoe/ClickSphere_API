@@ -115,10 +115,6 @@ public class RagController(IRagService RagService, IDbService DbService) : Contr
     {
         // decode base64 keywords
         string keywords = Encoding.UTF8.GetString(Convert.FromBase64String(b64Keywords));
-
-        //add prefix to the keywords
-        keywords = "Get all relevant documents which may be important for answering this question: " + keywords;
-
         return await RagService.GetRagDocuments(keywords, distance, database, viewName, columnName);
     }
 }

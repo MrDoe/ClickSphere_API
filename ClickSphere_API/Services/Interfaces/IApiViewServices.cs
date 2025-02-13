@@ -89,7 +89,7 @@ public interface IApiViewService
     /// <param name="view">The view name</param>
     /// <param name="dropExisting">Whether to drop the existing view</param>
     /// <returns>string</returns>
-    Task<string> ImportViewFromODBC(string view, bool dropExisting);
+    Task<IResult> ImportViewFromODBC(string view, bool dropExisting);
 
     /// <summary>
     /// Get columns from ODBC view
