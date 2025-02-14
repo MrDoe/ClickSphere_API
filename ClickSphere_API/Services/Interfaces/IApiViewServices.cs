@@ -11,7 +11,7 @@ public interface IApiViewService
     /// </summary>
     /// <param name="view">The view to create</param>
     /// <returns>Result object</returns>
-    Task<IResult> CreateView(View view);
+    Task<HttpResponseMessage> CreateView(View view);
 
     /// <summary>
     /// Creates a new materialized view
@@ -104,4 +104,11 @@ public interface IApiViewService
     /// </summary>
     /// <returns>List of views available for import as strings</returns>
     Task<IList<string>> GetViewsFromODBC();
+
+    /// <summary>
+    /// Synchronize view table with ODBC table
+    /// </summary>
+    /// <param name="view">The view to synchronize</param>
+    /// <returns>The result of the synchronization</returns>
+    Task<IResult> SynchronizeView(string view);
 }

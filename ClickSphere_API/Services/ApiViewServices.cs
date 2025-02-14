@@ -1,6 +1,7 @@
 using System.Text;
 using ClickSphere_API.Models;
 using System.Data.Odbc;
+using System.Net;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -21,7 +22,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     /// </summary>
     /// <param name="view">The view to create</param>
     /// <returns>The result of the view creation</returns>
-    public async Task<IResult> CreateView(View view)
+    public async Task<HttpResponseMessage> CreateView(View view)
     {
         string query = $"CREATE VIEW {view.Database}.{view.Id} AS {view.Query};";
         int result;
@@ -31,7 +32,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         }
         catch (Exception e)
         {
-            return Results.BadRequest(e.Message);
+            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = e.Message };
         }
 
         // insert view into CV_Views table
@@ -40,12 +41,12 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             string insertQuery = $"INSERT INTO ClickSphere.Views (Id, Name, Description, Type) VALUES ('{view.Id}','{view.Name}','{view.Description}','V');";
             int insertResult = await _dbService.ExecuteNonQuery(insertQuery);
             if (insertResult < 0)
-                return Results.BadRequest("Could not insert view into ClickSphere.Views table");
+                return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = "Could not insert view into ClickSphere.Views table" };
             else
-                return Results.Ok();
+                return new HttpResponseMessage(HttpStatusCode.OK);
         }
         else
-            return Results.BadRequest("Could not create view");
+            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = "Could not create view" };
     }
 
     /// <summary>
@@ -361,13 +362,11 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         $"FROM odbc('{odbcConnectionString}', '', 'V_VIEW_COLUMNS') " +
         $"WHERE TABLE_NAME = '{view}';";
 
-        try
+        columns = await _dbService.ExecuteQueryDictionary(query);
+
+        if (columns.Count == 0)
         {
-            columns = await _dbService.ExecuteQueryDictionary(query);
-        }
-        catch (Exception e)
-        {
-            return Results.BadRequest(e.Message);
+            return Results.BadRequest("No columns found in ODBC view");
         }
 
         // convert from MS SQL to ClickHouse data types
@@ -426,6 +425,9 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
 
         if (dropExisting)
         {
+            query = $"DROP VIEW IF EXISTS ClickSphere.{view};";
+            await _dbService.ExecuteNonQuery(query);
+
             query = $"DROP TABLE IF EXISTS ClickSphere.{view}_TBL;";
             await _dbService.ExecuteNonQuery(query);
 
@@ -451,42 +453,19 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         }
 
         // each view has an ID column
-        query += ") ENGINE = MergeTree() ORDER BY ID";
-
-        try
-        {
-            await _dbService.ExecuteNonQuery(query);
-        }
-        catch (Exception e)
-        {
-            return Results.BadRequest(e.Message);
-        }
+        query += ") ENGINE = ReplacingMergeTree(ID) ORDER BY ID SETTINGS allow_experimental_replacing_merge_with_cleanup = 1;";
+        await _dbService.ExecuteNonQuery(query);
 
         // call ReplaceUmlautsInView procedure on ODBC server
-        try
-        {
-            await ExecuteOdbc($"EXEC ReplaceUmlautsInView '{view}'");
-        }
-        catch (Exception e)
-        {
-            return Results.BadRequest(e.Message);
-        }
+        await ExecuteOdbc($"EXEC ReplaceUmlautsInView '{view}'");
 
         // fill table with data
         query = $"INSERT INTO ClickSphere.{view}_TBL " +
-                $"SELECT * FROM odbc('{odbcConnectionString}', '', '{view}');";
-
-        try
-        {
-            await _dbService.ExecuteNonQuery(query);
-        }
-        catch (Exception e)
-        {
-            return Results.BadRequest(e.Message);
-        }
+                $"SELECT * FROM odbc('{odbcConnectionString}', '', '{view}_CH');";
+        await _dbService.ExecuteNonQuery(query);
 
         // add view configuration to ClickSphere.Views
-        await CreateView(new View
+        var result = await CreateView(new View
         {
             Id = view,
             Name = view,
@@ -496,6 +475,71 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             Type = "V",
             Questions = ""
         });
+
+        if(result != null && result.IsSuccessStatusCode)
+            return Results.Ok();
+        else
+            return Results.BadRequest(result?.ReasonPhrase);
+    }
+
+    /// <summary>
+    /// Synchronize view table with ODBC table
+    /// </summary>
+    /// <param name="view">The view to synchronize</param>
+    /// <returns>The result of the synchronization</returns>
+    public async Task<IResult> SynchronizeView(string view)
+    {
+        if (string.IsNullOrEmpty(view))
+        {
+            return Results.BadRequest("Invalid request");
+        }
+
+        // check if system table
+        if (view == "Views" || view == "ViewColumns" || view == "Embeddings" || view == "Config" || view == "Users")
+        {
+            return Results.BadRequest("Cannot synchronize system tables");
+        }
+
+        string odbcConnectionString = $"DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};";
+
+        // synchronize deleted rows
+        string query = $"SELECT ID FROM ClickSphere.{view}_TBL";
+        IList<string> ids = await _dbService.ExecuteQuery(query) ?? [];
+
+        query = $"SELECT ID FROM odbc('{odbcConnectionString}', '', '{view}_CH')";
+        IList<string> odbcIds = await _dbService.ExecuteQuery(query) ?? [];
+
+        var idsToDelete = ids.Except(odbcIds).ToList();
+        if (idsToDelete.Count > 0)
+        {
+            query = $"ALTER TABLE ClickSphere.{view}_TBL DELETE WHERE ID IN ({string.Join(",", idsToDelete.Select(id => $"'{id}'"))});";
+            await _dbService.ExecuteNonQuery(query);
+        }
+
+        // execute insert query
+        query = $"INSERT INTO ClickSphere.{view}_TBL " +
+                $"SELECT * FROM odbc('{odbcConnectionString}', '', '{view}_CH');";
+        
+        try
+        {
+            await _dbService.ExecuteNonQuery(query);
+        }
+        catch (Exception e)
+        {
+            return Results.BadRequest(e.Message);
+        }
+
+        // call OPTIMIZE TABLE to delete outdated rows
+        query = $"OPTIMIZE TABLE ClickSphere.{view}_TBL FINAL CLEANUP;";
+
+        try
+        {
+            await _dbService.ExecuteNonQuery(query);
+        }
+        catch (Exception e)
+        {
+            return Results.BadRequest(e.Message);
+        }
 
         return Results.Ok();
     }

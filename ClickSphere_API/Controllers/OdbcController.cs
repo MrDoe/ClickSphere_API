@@ -66,4 +66,32 @@ public class OdbcController(IApiViewService viewService) : ControllerBase
     {
         return await _viewService.GetViewsFromODBC();
     }
+
+    /// <summary>
+    /// Synchronize a view from the ODBC connection with ClickHouse.
+    /// </summary>
+    /// <param name="view">The view to synchronize.</param>
+    /// <returns>The result of the synchronization.</returns>
+    [HttpGet]
+    [Route("/odbc/synchronize")]
+    public async Task<IResult> SynchronizeView(string view)
+    {
+        if(string.IsNullOrEmpty(view))
+        {
+            return Results.BadRequest("View name is empty");
+        }
+
+        IResult result;       
+        try
+        {
+            result = await _viewService.SynchronizeView(view);
+        }
+        catch (Exception e)
+        {
+            return Results.InternalServerError(e.Message);
+        }
+
+        return result;
+    }
+    
 }

@@ -21,7 +21,15 @@ public class ViewController(IApiViewService viewServices) : ControllerBase
     [Route("/createView")]
     public async Task<IResult> CreateView(View view)
     {
-        return await ViewServices.CreateView(view);
+        HttpResponseMessage result = await ViewServices.CreateView(view);
+        if (result.IsSuccessStatusCode)
+        {
+            return Results.Ok("View created successfully");
+        }
+        else
+        {
+            return Results.BadRequest(result.ReasonPhrase);
+        }
     }
 
     /// <summary>

@@ -120,7 +120,14 @@ public class DbService : IDbService
 
         while (await reader.ReadAsync())
         {
-            result.Add(reader.GetString(0));
+            if (reader.GetFieldType(0) == typeof(string))
+            {
+                result.Add(reader.GetString(0));
+            }
+            else
+            {
+                result.Add(reader.GetValue(0)?.ToString() ?? string.Empty);
+            }
         }
         return result;
     }
