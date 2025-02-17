@@ -1,6 +1,8 @@
 using ClickSphere_API.Models;
-
+using Octonica.ClickHouseClient;
+using Octonica.ClickHouseClient.Exceptions;
 namespace ClickSphere_API.Services;
+
 /// <summary>
 /// Represents a database service.
 /// </summary>
@@ -81,4 +83,14 @@ public interface IDbService
     /// <param name="type">The type of the configuration (RAG, Text2SQL)</param>
     /// <returns>True if the configuration was set successfully</returns>
     Task SetAiConfig(string type, AiConfig config);
+
+
+    /// <summary>
+    /// Executes a query and returns a list of dictionaries.
+    /// </summary>
+    /// <param name="query">The query to execute.</param>
+    /// <returns>A list of dictionaries.</returns>
+    IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryDictionaryAsync(string query);
+
+    ClickHouseConnection CreateConnection();
 }

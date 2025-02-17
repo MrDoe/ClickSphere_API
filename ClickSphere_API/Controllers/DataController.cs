@@ -17,35 +17,55 @@ namespace ClickSphere_API.Controllers
         /// <param name="query">The query to be executed.</param>
         /// <returns>The result of the query.</returns>
         //[Authorize]
-        [HttpPost]
+        [HttpGet]
         [Route("/customQuery")]
-        public async Task<IEnumerable<Dictionary<string, object>>> CustomQuery([FromBody] string query)
+        public async IAsyncEnumerable<Dictionary<string, object>> CustomQuery(string query)
         {
-            // decode base64 string
-            try 
+            Dictionary<string, object>? errorResult = null;
+
+            // Decode base64
+            try
             {
                 query = Encoding.UTF8.GetString(Convert.FromBase64String(query));
             }
             catch (Exception e)
             {
-                return [new Dictionary<string, object> { { "error", "Invalid base64 string\n" + e.Message } }];
+                errorResult = new Dictionary<string, object> { { "error", "Invalid base64 string\n" + e.Message } };
             }
 
-            // validate and sanitize the input
+            // Validate query
             var parsedQuery = sqlParser.Parse(query);
             if (!parsedQuery.IsValid || parsedQuery.SanitizedQuery == null)
             {
-                return [new Dictionary<string, object> { { "error", "Invalid SQL query" } }];
+                errorResult = new Dictionary<string, object> { { "error", "Invalid query" } };
             }
 
-            // execute the sanitized query
-            try 
+            if (errorResult != null)
             {
-                return await dbService.ExecuteQueryDictionary(parsedQuery.SanitizedQuery);
+                yield return errorResult;
+                yield break;
             }
-            catch (Exception e)
+
+            // Prepare to store exception
+            Exception? ex = null;
+            IAsyncEnumerable<Dictionary<string, object>> results;
+
+            // read data
+            using var connection = dbService.CreateConnection();
+            await connection.OpenAsync();
+            var command = connection.CreateCommand(query);
+            using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                return [new Dictionary<string, object> { { "Error", e.Message } }];
+                var row = new Dictionary<string, object>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    if (reader.GetValue(i).ToString() == "NaN")
+                        row[reader.GetName(i)] = "NaN";
+                    else
+                        row[reader.GetName(i)] = reader.GetValue(i);
+                }
+                yield return row;
             }
         }
     }

@@ -67,14 +67,14 @@ public class DbService : IDbService
     /// Create a connection to the ClickHouse database
     /// </summary>
     /// <returns>A ClickHouseConnection object that represents the connection to the database</returns>
-    private ClickHouseConnection CreateConnection()
+    public ClickHouseConnection CreateConnection()
     {
         if (_connString == null)
             throw new Exception("ClickHouse connection string is not valid");
 
         // increate timeout to 5 minutes
         _connString.CommandTimeout = 300;
-        
+
         return new ClickHouseConnection(_connString.ConnectionString);
     }
 
@@ -159,6 +159,31 @@ public class DbService : IDbService
             result.Add(row);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Execute a query on the ClickHouse database
+    /// </summary>
+    /// <param name="query">The query to be executed</param>
+    /// <returns>An IAsyncEnumerable of dictionary that represents the result of the query</returns>
+    public async IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryDictionaryAsync(string query)
+    {
+        using var connection = CreateConnection();
+        await connection.OpenAsync();
+        var command = connection.CreateCommand(query);
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var row = new Dictionary<string, object>();
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetValue(i).ToString() == "NaN")
+                    row[reader.GetName(i)] = "NaN";
+                else
+                    row[reader.GetName(i)] = reader.GetValue(i);
+            }
+            yield return row;
+        }
     }
 
     /// <summary>

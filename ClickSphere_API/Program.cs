@@ -68,7 +68,10 @@ builder.Services.AddAuthentication().AddBearerToken(config =>
 });
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options => 
+{
+    options.JsonSerializerOptions.WriteIndented = false;
+});
 
 // enable compression for Kestrel
 builder.Services.AddResponseCompression(options =>
