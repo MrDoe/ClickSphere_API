@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using ClickSphere_API.Services;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -74,8 +76,13 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 });
 
 // enable compression for Kestrel
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
 builder.Services.AddResponseCompression(options =>
 {
+    options.Providers.Add<GzipCompressionProvider>();
     options.EnableForHttps = true;
 });
 
@@ -92,6 +99,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 app.UseCors();
+app.UseResponseCompression();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

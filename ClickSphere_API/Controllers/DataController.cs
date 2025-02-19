@@ -14,19 +14,20 @@ namespace ClickSphere_API.Controllers
         /// <summary>
         /// Execute custom query with SQL string in base64 format.
         /// </summary>
-        /// <param name="query">The query to be executed.</param>
+        /// <param name="b64Query">The query to be executed in Base64 encoding.</param>
         /// <returns>The result of the query.</returns>
         //[Authorize]
         [HttpGet]
         [Route("/customQuery")]
-        public async IAsyncEnumerable<Dictionary<string, object>> CustomQuery(string query)
+        public async IAsyncEnumerable<Dictionary<string, object>> CustomQuery(string b64Query)
         {
             Dictionary<string, object>? errorResult = null;
 
             // Decode base64
+            string query = "";
             try
             {
-                query = Encoding.UTF8.GetString(Convert.FromBase64String(query));
+                query = Encoding.UTF8.GetString(Convert.FromBase64String(b64Query));
             }
             catch (Exception e)
             {
@@ -45,10 +46,6 @@ namespace ClickSphere_API.Controllers
                 yield return errorResult;
                 yield break;
             }
-
-            // Prepare to store exception
-            Exception? ex = null;
-            IAsyncEnumerable<Dictionary<string, object>> results;
 
             // read data
             using var connection = dbService.CreateConnection();
