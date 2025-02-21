@@ -319,7 +319,8 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         if (string.IsNullOrEmpty(database) || string.IsNullOrEmpty(viewId) || string.IsNullOrEmpty(column))
             return [];
 
-        return await _dbService.ExecuteQuery($"SELECT DISTINCT {column} FROM {database}.{viewId} LIMIT 50") ?? [];
+        return await _dbService.ExecuteQuery(
+            $"SELECT DISTINCT `{column}` FROM `{database}`.`{viewId}` WHERE `{column}` is not null AND `{column}` != '' ORDER BY 1 LIMIT 100") ?? [];
     }
 
     /// <summary>
