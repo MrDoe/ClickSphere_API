@@ -228,10 +228,32 @@ public class DbService : IDbService
         while (await reader.ReadAsync())
         {
             var row = new T();
-            for (var i = 0; i < reader.FieldCount; i++)
+            for (int i = 0; i < reader.FieldCount; ++i)
             {
                 var property = typeof(T).GetProperty(reader.GetName(i));
-                property?.SetValue(row, reader.GetValue(i));
+                if (property != null)
+                {
+                    var value = reader.GetValue(i);
+                    if (value != DBNull.Value)
+                    {
+                        // Handle type conversion for nullable types
+                        if (Nullable.GetUnderlyingType(property.PropertyType) != null)
+                        {
+                            // Convert the value to the nullable's underlying type
+                            value = Convert.ChangeType(value, Nullable.GetUnderlyingType(property.PropertyType)!);
+                        }
+                        // Handle regular type conversion
+                        else if (value.GetType() != property.PropertyType)
+                        {
+                            value = Convert.ChangeType(value, property.PropertyType);
+                        }
+                        property.SetValue(row, value);
+                    }
+                    else
+                    {
+                        property.SetValue(row, null);
+                    }
+                }
             }
             result.Add(row);
         }
@@ -364,7 +386,7 @@ public class DbService : IDbService
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String, Questions String) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String, Width UInt16) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
         await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.Embeddings (Id UUID, Question String, Database String, Table String, SQL_Query String, Embedding_Question Array(Float32)) ENGINE = MergeTree() PRIMARY KEY(Id)";

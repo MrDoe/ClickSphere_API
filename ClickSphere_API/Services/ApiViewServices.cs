@@ -240,11 +240,23 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
                 _ => "TextBox",
             };
 
+            string? columnWidth = col["Data Type"] switch
+            {
+                "String" or "Nullable(String)" => "200",
+                "UInt8" or "UInt16" or "UInt32" or "UInt64" or "Int8" or "Int16" or "Int32" or "Int64" => "100",
+                "Nullable(UInt8)" or "Nullable(UInt16)" or "Nullable(UInt32)" or "Nullable(UInt64)" or "Nullable(Int8)" or "Nullable(Int16)" or "Nullable(Int32)" or "Nullable(Int64)" => "100",
+                "Float32" or "Float64" => "100",
+                "Nullable(Float32)" or "Nullable(Float64)" => "100",
+                "DateTime" or "DateTime64(3)" => "100",
+                "Nullable(DateTime)" or "Nullable(DateTime64(3))" => "100",
+                _ => "200",
+            };
+
             // escape single quotes from data type
             string dataType = col["Data Type"].ToString()?.Replace("'", "''") ?? "";
 
-            string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter) " +
-                                 $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{dataType}','{controlType}',{sorter});";
+            string insertQuery = "INSERT INTO ClickSphere.ViewColumns (Id, Database, ViewId, ColumnName, DataType, ControlType, Sorter, Width) " +
+                                 $"VALUES ('{Guid.NewGuid()}','{database}','{viewId}','{col["Column Name"]}','{dataType}','{controlType}',{sorter}, {columnWidth});";
 
             await _dbService.ExecuteNonQuery(insertQuery);
             ++sorter;
@@ -297,7 +309,8 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
                        $"UPDATE ControlType = '{column.ControlType}', " +
                        $"Placeholder = '{placeholder}', " +
                        $"Sorter = {column.Sorter}, " +
-                       $"Description = '{description}' " +
+                       $"Description = '{description}', " +
+                       $"Width = {column.Width} " +
                        $"WHERE Id = '{column.Id}';";
 
         int result = await _dbService.ExecuteNonQuery(query);

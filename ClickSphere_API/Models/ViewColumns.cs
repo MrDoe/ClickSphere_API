@@ -58,4 +58,9 @@ public class ViewColumns
     /// Gets or sets the description of the column.
     /// </summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Gets or sets the default column width.
+    /// </summary>
+    public int? Width { get; set; }
 }
