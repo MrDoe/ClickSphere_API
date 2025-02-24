@@ -161,4 +161,6 @@ public class ViewController(IApiViewService viewServices) : ControllerBase
         
         return await ViewServices.GetDistinctValues(database, viewId, columnName);
     }
+
+    
 }

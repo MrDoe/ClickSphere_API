@@ -2,6 +2,9 @@ using System.Text;
 using ClickSphere_API.Models;
 using System.Data.Odbc;
 using System.Net;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -591,4 +594,112 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         using OdbcCommand command = new(sql, connection);
         return await command.ExecuteNonQueryAsync();
     }
+
+    /// <summary>
+    /// Export view to Excel
+    /// </summary>
+    /// /// <param name="query">The query to execute</param>
+    /// <param name="viewId">The ID of the view</param>
+    /// <param name="fileName">The name of the file</param>
+    /// <returns>The result of the export</returns>
+    public async Task ExportToExcel(string query, string fileName)
+    {
+        // get all rows
+        var data = new GridData()
+        {
+            Rows = _dbService.ExecuteQueryDictionaryAsync(query),
+            Columns = _dbService
+        };
+        
+
+        // use DocumentFormat.OpenXml to create Excel file
+        using var stream = new MemoryStream();
+        using var document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+        var workbookPart = document.AddWorkbookPart();
+
+        // create workbook
+        workbookPart.Workbook = new Workbook();
+        var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+        var sheetData = new SheetData();
+        worksheetPart.Worksheet = new Worksheet(sheetData);
+
+        // create columns
+        var columns = data?.Columns.ToList();
+        var columnsCount = columns?.Count ?? 0;
+        var columnsWidth = new double[columnsCount];
+        var columnsStyle = new uint[columnsCount];
+        var columnsCellFormats = new CellFormat[columnsCount];
+        var columnsCellFormatsIndex = new uint[columnsCount];
+
+        // create header row
+        var headerRow = new Row();
+        for (int i = 0; i < columnsCount; i++)
+        {
+            var cell = new Cell
+            {
+                DataType = CellValues.String,
+                CellValue = new CellValue(columns![i])
+            };
+            headerRow.Append(cell);
+        }
+
+        sheetData.Append(headerRow);
+        if(data == null || data.Rows == null || columns == null || columns.Count == 0)
+        {
+            return;
+        }
+
+        // create rows
+        foreach (var row in data?.Rows!)
+        {
+            var dataRow = new Row();
+            for (int i = 0; i < columnsCount; i++)
+            {
+                var cell = new Cell
+                {
+                    DataType = CellValues.String,
+                    CellValue = new CellValue(row[columns[i]].ToString() ?? "")
+                };
+                dataRow.Append(cell);
+            }
+            sheetData.Append(dataRow);
+        }
+
+        // create styles
+        var workbookStylesPart = workbookPart.AddNewPart<WorkbookStylesPart>();
+        workbookStylesPart.Stylesheet = new Stylesheet();
+
+        // create fonts
+        var fonts = new Fonts();
+        fonts.Append(new Font(new Bold(), new FontSize() { Val = 11 }, new Color() { Rgb = new HexBinaryValue() { Value = "000000" } }));
+        workbookStylesPart.Stylesheet.Fonts = fonts;
+
+        // create fills
+        var fills = new Fills();
+        fills.Append(new Fill(new PatternFill() { PatternType = PatternValues.None }));
+        workbookStylesPart.Stylesheet.Fills = fills;
+
+        // create borders
+        var borders = new Borders();
+        borders.Append(new Border(new LeftBorder(), new RightBorder(), new TopBorder(), new BottomBorder(), new DiagonalBorder()));
+        workbookStylesPart.Stylesheet.Borders = borders;
+
+        // create cell formats
+        var cellFormats = new CellFormats();
+        cellFormats.Append(new CellFormat() { FontId = 0, FillId = 0, BorderId = 0 });
+        workbookStylesPart.Stylesheet.CellFormats = cellFormats;
+
+        // save workbook
+        workbookPart.Workbook.Save();
+
+        // save worksheet
+        worksheetPart.Worksheet.Save();
+
+        // save styles
+        workbookStylesPart.Stylesheet.Save();
+
+        // save document
+        document.Dispose();
+        File.WriteAllBytes(fileName, stream.ToArray());
+    }    
 }
