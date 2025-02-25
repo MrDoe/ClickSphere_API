@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models;
+using System.Text;
 namespace ClickSphere_API.Controllers;
 /// <summary>
 /// Controller class for managing views in the ClickSphere database system
@@ -162,5 +163,20 @@ public class ViewController(IApiViewService viewServices) : ControllerBase
         return await ViewServices.GetDistinctValues(database, viewId, columnName);
     }
 
+    /// <summary>
+    /// Export view to Excel file
+    /// </summary>
+    /// <param name="b64query">The view query to export</param>
+    /// <param name="viewId">The viewId to get the data from</param>
+    /// <param name="fileName">The name of the file</param>
+    /// <returns>The Excel file</returns>
+    //[Authorize]
+    [HttpGet]
+    [Route("/exportToExcel")]
+    public async Task<FileResult?> ExportToExcel(string b64query, string viewId, string fileName)
+    {
+        string query = Encoding.UTF8.GetString(Convert.FromBase64String(b64query));
+        return await ViewServices.ExportToExcel(query, viewId, fileName);
+    }
     
 }

@@ -1,4 +1,5 @@
 using ClickSphere_API.Models;
+using Microsoft.AspNetCore.Mvc;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -111,4 +112,13 @@ public interface IApiViewService
     /// <param name="view">The view to synchronize</param>
     /// <returns>The result of the synchronization</returns>
     Task<IResult> SynchronizeView(string view);
+
+    /// <summary>
+    /// Export view to Excel
+    /// </summary>
+    /// <param name="query">The query to execute</param>
+    /// <param name="viewId">The ID of the view</param>
+    /// <param name="fileName">The name of the file</param>
+    /// <returns>The result of the export</returns>
+    Task<FileResult?> ExportToExcel(string query, string viewId, string fileName);
 }

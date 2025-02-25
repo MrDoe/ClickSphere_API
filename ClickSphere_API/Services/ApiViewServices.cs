@@ -5,6 +5,11 @@ using System.Net;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
+using System.Globalization;
+using NodaTime;
+using NodaTime.Text;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -493,7 +498,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             Questions = ""
         });
 
-        if(result != null && result.IsSuccessStatusCode)
+        if (result != null && result.IsSuccessStatusCode)
             return Results.Ok();
         else
             return Results.BadRequest(result?.ReasonPhrase);
@@ -536,7 +541,7 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         // execute insert query
         query = $"INSERT INTO ClickSphere.{view}_TBL " +
                 $"SELECT * FROM odbc('{odbcConnectionString}', '', '{view}_CH');";
-        
+
         try
         {
             await _dbService.ExecuteNonQuery(query);
@@ -598,108 +603,340 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     /// <summary>
     /// Export view to Excel
     /// </summary>
-    /// /// <param name="query">The query to execute</param>
+    /// <param name="query">The query to execute</param>
     /// <param name="viewId">The ID of the view</param>
     /// <param name="fileName">The name of the file</param>
     /// <returns>The result of the export</returns>
-    public async Task ExportToExcel(string query, string fileName)
+    public async Task<FileResult?> ExportToExcel(string query, string viewId, string fileName)
     {
-        // get all rows
-        var data = new GridData()
+        try
         {
-            Rows = _dbService.ExecuteQueryDictionaryAsync(query),
-            Columns = _dbService
-        };
-        
+            // Get all rows from the query
+            var rowData = await _dbService.ExecuteQueryDictionary(query);
+            if (rowData == null)
+                return null;
 
-        // use DocumentFormat.OpenXml to create Excel file
-        using var stream = new MemoryStream();
-        using var document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
-        var workbookPart = document.AddWorkbookPart();
+            // Get column names
+            var columns = (await GetViewColumns("ClickSphere", viewId, false))
+                .Select(c => c.ColumnName)
+                .Where(name => name != null)
+                .Select(name => name!)
+                .ToList();
 
-        // create workbook
-        workbookPart.Workbook = new Workbook();
-        var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-        var sheetData = new SheetData();
-        worksheetPart.Worksheet = new Worksheet(sheetData);
-
-        // create columns
-        var columns = data?.Columns.ToList();
-        var columnsCount = columns?.Count ?? 0;
-        var columnsWidth = new double[columnsCount];
-        var columnsStyle = new uint[columnsCount];
-        var columnsCellFormats = new CellFormat[columnsCount];
-        var columnsCellFormatsIndex = new uint[columnsCount];
-
-        // create header row
-        var headerRow = new Row();
-        for (int i = 0; i < columnsCount; i++)
-        {
-            var cell = new Cell
+            // Use DocumentFormat.OpenXml to create Excel file
+            using var stream = new MemoryStream();
+            using (var document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook))
             {
-                DataType = CellValues.String,
-                CellValue = new CellValue(columns![i])
-            };
-            headerRow.Append(cell);
-        }
+                // Add parts
+                var workbookPart = document.AddWorkbookPart();
+                workbookPart.Workbook = new Workbook();
+                var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
 
-        sheetData.Append(headerRow);
-        if(data == null || data.Rows == null || columns == null || columns.Count == 0)
-        {
-            return;
-        }
+                // Create worksheet
+                var worksheet = new Worksheet();
+                var sheetData = new SheetData();
+                worksheetPart.Worksheet = worksheet;
 
-        // create rows
-        foreach (var row in data?.Rows!)
-        {
-            var dataRow = new Row();
-            for (int i = 0; i < columnsCount; i++)
-            {
-                var cell = new Cell
+                // Create columns with widths
+                var columnsList = new Columns();
+                for (int i = 0; i < columns.Count; ++i)
                 {
-                    DataType = CellValues.String,
-                    CellValue = new CellValue(row[columns[i]].ToString() ?? "")
+                    columnsList.Append(new Column
+                    {
+                        Min = (uint)(i + 1),
+                        Max = (uint)(i + 1),
+                        Width = 15,
+                        CustomWidth = true
+                    });
+                }
+                worksheet.Append(columnsList);
+
+                // Sanitize sheet name
+                var invalidCharsRegex = new Regex(@"[\:\/\\\?*\[\]]");
+                string sanitizedSheetName = invalidCharsRegex.Replace(fileName, "");
+                sanitizedSheetName = sanitizedSheetName.Length > 31
+                    ? sanitizedSheetName.Substring(0, 31)
+                    : sanitizedSheetName;
+
+                // Add worksheet to workbook
+                var sheets = workbookPart.Workbook.AppendChild(new Sheets());
+                var sheet = new Sheet
+                {
+                    Id = workbookPart.GetIdOfPart(worksheetPart),
+                    SheetId = 1,
+                    Name = sanitizedSheetName
                 };
-                dataRow.Append(cell);
+                sheets.Append(sheet);
+
+                // Create styles
+                var workbookStylesPart = workbookPart.AddNewPart<WorkbookStylesPart>();
+                workbookStylesPart.Stylesheet = CreateExcelStyleSheet(workbookPart);
+
+                // Create header row with formatting
+                var headerRow = new Row { Height = 20, CustomHeight = true };
+                foreach (var column in columns)
+                {
+                    var cell = new Cell
+                    {
+                        DataType = CellValues.String,
+                        CellValue = new CellValue(column),
+                        StyleIndex = 2 // Header style
+                    };
+                    headerRow.Append(cell);
+                }
+                sheetData.Append(headerRow);
+
+                // Check for valid data
+                if (rowData.Count == 0 || columns.Count == 0)
+                {
+                    worksheet.Append(sheetData);
+                    workbookPart.Workbook.Save();
+
+                    stream.Seek(0, SeekOrigin.Begin);
+                    return CreateExcelResult(stream, fileName);
+                }
+
+                // Create data rows
+                foreach (var row in rowData)
+                {
+                    var dataRow = new Row();
+                    foreach (var column in columns)
+                    {
+                        Cell cell = new();
+
+                        if (!row.TryGetValue(column, out var value))
+                        {
+                            cell = new Cell
+                            {
+                                DataType = CellValues.String,
+                                CellValue = new CellValue(""),
+                                StyleIndex = 1
+                            };
+                            dataRow.Append(cell);
+                            continue;
+                        }
+
+                        if (value == null)
+                        {
+                            cell = new Cell
+                            {
+                                DataType = CellValues.String,
+                                CellValue = new CellValue(""),
+                                StyleIndex = 1
+                            };
+                        }
+                        else if (value is object objectValue)
+                        {
+                            var stringValue = objectValue.ToString();
+
+                            if(string.IsNullOrEmpty(stringValue))
+                            {
+                                cell = new Cell
+                                {
+                                    DataType = CellValues.String,
+                                    CellValue = new CellValue(""),
+                                    StyleIndex = 1
+                                };
+                            }
+                            // if string is datetime like "04/16/2020 00:00:00 +02:00"
+                            else if (Regex.IsMatch(stringValue, @"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2} \+\d{2}:\d{2}$"))
+                            {
+                                var date = ParseDateTimeString(stringValue);
+                                if (date != null)
+                                {
+                                    double oaDate = date.Value.ToOADate();
+                                    cell = new Cell
+                                    {
+                                        DataType = CellValues.Number,
+                                        CellValue = new CellValue(oaDate.ToString(CultureInfo.InvariantCulture)),
+                                        StyleIndex = 3 // Date format
+                                    };
+                                }
+                            }
+                            else
+                            {
+                                cell = new Cell
+                                {
+                                    DataType = CellValues.String,
+                                    CellValue = new CellValue(stringValue),
+                                    StyleIndex = 1
+                                };
+                            }
+                        }
+                        else if (value is DateTime dateTimeValue)
+                        {
+                            double oaDate = dateTimeValue.ToOADate();
+                            cell = new Cell
+                            {
+                                DataType = CellValues.Number,
+                                CellValue = new CellValue(oaDate.ToString(CultureInfo.InvariantCulture)),
+                                StyleIndex = 3 // Date format
+                            };
+                        }
+                        else if (value is int || value is long || value is double || value is float || value is decimal)
+                        {
+                            string number = string.Format(CultureInfo.InvariantCulture, "{0}", value);
+                            cell = new Cell
+                            {
+                                DataType = CellValues.Number,
+                                CellValue = new CellValue(number),
+                                StyleIndex = 1
+                            };
+                        }
+                        else
+                        {
+                            cell = new Cell
+                            {
+                                DataType = CellValues.String,
+                                CellValue = new CellValue(value.ToString() ?? ""),
+                                StyleIndex = 1
+                            };
+                        }
+                        dataRow.Append(cell);
+                    }
+                    sheetData.Append(dataRow);
+                }
+
+                worksheet.Append(sheetData);
+                workbookPart.Workbook.Save();
             }
-            sheetData.Append(dataRow);
+            stream.Seek(0, SeekOrigin.Begin);
+            return CreateExcelResult(stream, fileName);
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exporting to Excel: {ex.Message}");
+            return null;
+        }
+    }
 
-        // create styles
-        var workbookStylesPart = workbookPart.AddNewPart<WorkbookStylesPart>();
-        workbookStylesPart.Stylesheet = new Stylesheet();
+    private FileContentResult CreateExcelResult(MemoryStream stream, string fileName)
+    {
+        string extension = ".xlsx";
+        string downloadName = fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
+            ? fileName
+            : fileName + extension;
 
-        // create fonts
-        var fonts = new Fonts();
-        fonts.Append(new Font(new Bold(), new FontSize() { Val = 11 }, new Color() { Rgb = new HexBinaryValue() { Value = "000000" } }));
-        workbookStylesPart.Stylesheet.Fonts = fonts;
+        return new FileContentResult(stream.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        {
+            FileDownloadName = downloadName
+        };
+    }
 
-        // create fills
-        var fills = new Fills();
-        fills.Append(new Fill(new PatternFill() { PatternType = PatternValues.None }));
-        workbookStylesPart.Stylesheet.Fills = fills;
+    private Stylesheet CreateExcelStyleSheet(WorkbookPart workbookPart)
+    {
+        var stylesheet = new Stylesheet();
 
-        // create borders
-        var borders = new Borders();
-        borders.Append(new Border(new LeftBorder(), new RightBorder(), new TopBorder(), new BottomBorder(), new DiagonalBorder()));
-        workbookStylesPart.Stylesheet.Borders = borders;
+        // Create fonts
+        var fonts = new Fonts { Count = 2 };
+        fonts.Append(new Font()); // Default font
+        fonts.Append(
+            new Font(
+                new Bold(),
+                new FontSize { Val = 11 },
+                new Color { Rgb = new HexBinaryValue { Value = "000000" } }
+            )
+        ); // Bold font for headers
+        stylesheet.Fonts = fonts;
 
-        // create cell formats
-        var cellFormats = new CellFormats();
-        cellFormats.Append(new CellFormat() { FontId = 0, FillId = 0, BorderId = 0 });
-        workbookStylesPart.Stylesheet.CellFormats = cellFormats;
+        // Create fills
+        var fills = new Fills { Count = 3 };
+        fills.Append(new Fill { PatternFill = new PatternFill { PatternType = PatternValues.None } }); // Index 0
+        fills.Append(new Fill { PatternFill = new PatternFill { PatternType = PatternValues.Gray125 } }); // Index 1
+        fills.Append(
+            new Fill(
+                new PatternFill
+                {
+                    PatternType = PatternValues.Solid,
+                    ForegroundColor = new ForegroundColor { Rgb = "DDEBF7" }, // Light blue header
+                    BackgroundColor = new BackgroundColor { Indexed = 64 }
+                }
+            )
+        ); // Index 2 - Header fill
+        stylesheet.Fills = fills;
 
-        // save workbook
-        workbookPart.Workbook.Save();
+        // Create borders
+        var borders = new Borders { Count = 2 };
+        borders.Append(new Border()); // Default border
+        borders.Append(
+            new Border(
+                new LeftBorder { Style = BorderStyleValues.Thin },
+                new RightBorder { Style = BorderStyleValues.Thin },
+                new TopBorder { Style = BorderStyleValues.Thin },
+                new BottomBorder { Style = BorderStyleValues.Thin }
+            )
+        ); // Border for cells
+        stylesheet.Borders = borders;
 
-        // save worksheet
-        worksheetPart.Worksheet.Save();
+        // Create cell formats
+        var cellFormats = new CellFormats { Count = 4 };
+        cellFormats.Append(new CellFormat()); // Default format (0)
 
-        // save styles
-        workbookStylesPart.Stylesheet.Save();
+        // Regular cell with border (1)
+        cellFormats.Append(
+            new CellFormat
+            {
+                FontId = 0,
+                FillId = 0,
+                BorderId = 1,
+                ApplyBorder = true
+            }
+        );
 
-        // save document
-        document.Dispose();
-        File.WriteAllBytes(fileName, stream.ToArray());
-    }    
+        // Header cell with border and fill (2)
+        cellFormats.Append(
+            new CellFormat
+            {
+                FontId = 1,
+                FillId = 2,
+                BorderId = 1,
+                ApplyFill = true,
+                ApplyFont = true,
+                ApplyBorder = true,
+                Alignment = new Alignment { Horizontal = HorizontalAlignmentValues.Center }
+            }
+        );
+
+        // Date cell format (3)
+        cellFormats.Append(
+            new CellFormat
+            {
+                FontId = 0,
+                FillId = 0,
+                BorderId = 1,
+                ApplyBorder = true,
+                NumberFormatId = 14, // Date format
+                ApplyNumberFormat = true
+            }
+        );
+
+        stylesheet.CellFormats = cellFormats;
+        return stylesheet;
+    }
+
+    // parse date from extended iso to localdatetime
+    public DateTime? ParseDateTimeString(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return null;
+
+        try
+        {
+            // 
+            if (input.Contains("+") || input.Contains("Z"))
+            {
+                // convert to DateTime with NodaTime
+                var pattern = OffsetDateTimePattern.CreateWithInvariantCulture("MM/dd/yyyy HH:mm:ss +o<HH:mm>");
+                var result = pattern.Parse(input);
+                return result.Value.LocalDateTime.ToDateTimeUnspecified();
+            }
+        }
+        catch
+        {
+            return null;
+        }
+        return null;
+    }
+
 }

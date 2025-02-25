@@ -1,3 +1,5 @@
+
+
 namespace ClickSphere_API.Models;
 /// <summary>
 /// Represents the data of a grid.

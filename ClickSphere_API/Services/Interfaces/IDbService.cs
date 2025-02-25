@@ -84,7 +84,6 @@ public interface IDbService
     /// <returns>True if the configuration was set successfully</returns>
     Task SetAiConfig(string type, AiConfig config);
 
-
     /// <summary>
     /// Executes a query and returns a list of dictionaries.
     /// </summary>
@@ -92,5 +91,9 @@ public interface IDbService
     /// <returns>A list of dictionaries.</returns>
     IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryDictionaryAsync(string query);
 
+    /// <summary>
+    /// Opens a connection to the database.
+    /// </summary>
+    /// <returns></returns>
     ClickHouseConnection CreateConnection();
 }
