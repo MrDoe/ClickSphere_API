@@ -89,7 +89,7 @@ public interface IDbService
     /// </summary>
     /// <param name="query">The query to execute.</param>
     /// <returns>A list of dictionaries.</returns>
-    IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryDictionaryAsync(string query);
+    IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryAsStream(string query);
 
     /// <summary>
     /// Opens a connection to the database.

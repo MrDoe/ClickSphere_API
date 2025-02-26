@@ -166,7 +166,7 @@ public class DbService : IDbService
     /// </summary>
     /// <param name="query">The query to be executed</param>
     /// <returns>An IAsyncEnumerable of dictionary that represents the result of the query</returns>
-    public async IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryDictionaryAsync(string query)
+    public async IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryAsStream(string query)
     {
         using var connection = CreateConnection();
         await connection.OpenAsync();
