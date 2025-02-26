@@ -690,28 +690,4 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     //     stylesheet.CellFormats = cellFormats;
     //     return stylesheet;
     // }
-
-    // parse date from extended iso to localdatetime
-    public DateTime? ParseDateTimeString(string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return null;
-
-        try
-        {
-            // 
-            if (input.Contains("+") || input.Contains("Z"))
-            {
-                // convert to DateTime with NodaTime
-                var pattern = OffsetDateTimePattern.CreateWithInvariantCulture("MM/dd/yyyy HH:mm:ss +o<HH:mm>");
-                var result = pattern.Parse(input);
-                return result.Value.LocalDateTime.ToDateTimeUnspecified();
-            }
-        }
-        catch
-        {
-            return null;
-        }
-        return null;
-    }
 }
