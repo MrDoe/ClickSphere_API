@@ -34,7 +34,7 @@ public partial class AiService : IAiService
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
     /// <summary>
@@ -72,7 +72,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
         OllamaRequestOptions options = new()
         {
             temperature = 0.1,
-            num_ctx = 8192
+            num_ctx = 2048
         };
 
         OllamaRequest request = new()
@@ -252,8 +252,10 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
                 int endSqlIndex = responseText.LastIndexOf("```");
                 if (sqlIndex != -1 && endSqlIndex != -1)
                 {
-                    responseText = responseText[(sqlIndex + 5)..endSqlIndex];
+                    responseText = responseText[(sqlIndex + 6)..endSqlIndex];
                 }
+                
+                responseText = responseText.Trim('\n');
 
                 // get the query after the first SELECT until the first ';' character
                 int selectIndex = responseText.IndexOf("SELECT");

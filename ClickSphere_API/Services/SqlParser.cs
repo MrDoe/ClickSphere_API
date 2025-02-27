@@ -27,6 +27,7 @@ namespace ClickSphere_API.Services
             }
 
             // trim query
+            query = query.Trim('"');
             query = query.Trim();
 
             // cut semi-colon from the end of the query
