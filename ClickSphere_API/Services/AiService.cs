@@ -255,7 +255,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
                     responseText = responseText[(sqlIndex + 6)..endSqlIndex];
                 }
                 
-                responseText = responseText.Trim('\n');
+                responseText = responseText.Replace("\\n", " ");
 
                 // get the query after the first SELECT until the first ';' character
                 int selectIndex = responseText.IndexOf("SELECT");
@@ -271,6 +271,9 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
                 {
                     responseText = responseText[selectIndex..(semicolonIndex + 1)];
                 }
+
+                // remove semicolon
+                responseText = responseText.TrimEnd(';');
 
                 if (useEmbeddings)
                 {

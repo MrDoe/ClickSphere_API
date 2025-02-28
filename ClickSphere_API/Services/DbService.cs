@@ -245,7 +245,30 @@ public class DbService : IDbService
                         // Handle regular type conversion
                         else if (value.GetType() != property.PropertyType)
                         {
-                            value = Convert.ChangeType(value, property.PropertyType);
+                            //Handle DateTime conversion
+                            if (property.PropertyType == typeof(DateTime) && value is DateTimeOffset dto)
+                            {
+                                value = dto.DateTime;
+                            }
+                            else if (property.PropertyType == typeof(DateTime?) && value is DateTimeOffset dto2)
+                            {
+                                value = dto2.DateTime;
+                            }
+                            else if (property.PropertyType == typeof(DateTime) && value is string strValue && DateTime.TryParse(strValue, out var dateTimeValue))
+                            {
+                                value = dateTimeValue;
+                            }
+                            else if (property.PropertyType == typeof(DateTime?) && value is string strValue2 && DateTime.TryParse(strValue2, out var dateTimeValue2))
+                            {
+                                value = dateTimeValue2;
+                            }
+                            else if (property.PropertyType.IsEnum)
+                            {
+                                // Convert the value to the enum type
+                                value = Enum.ToObject(property.PropertyType, value);
+                            }
+                            else // Convert the value to the property type
+                                value = Convert.ChangeType(value, property.PropertyType);
                         }
                         property.SetValue(row, value);
                     }
@@ -383,7 +406,8 @@ public class DbService : IDbService
             }
         }
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String, Questions String) ENGINE = MergeTree() PRIMARY KEY(Id)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views " +
+                "(Id String, Name String, Description String, Type String, Questions String, LastSync DateTime) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
         query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String, Width UInt16) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";

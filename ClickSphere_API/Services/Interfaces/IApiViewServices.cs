@@ -106,11 +106,11 @@ public interface IApiViewService
     /// <returns>List of views available for import as strings</returns>
     Task<IList<string>> GetViewsFromODBC();
 
-
     /// <summary>
     /// Synchronize view table with ODBC table
     /// </summary>
     /// <param name="view">The view to synchronize</param>
+    /// <param name="force">Whether to force synchronization</param>
     /// <returns>The result of the synchronization</returns>
-    Task<IResult> SynchronizeView(string view);
+    Task<IResult> SynchronizeView(string view, bool force = false);
 }

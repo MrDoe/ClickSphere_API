@@ -49,6 +49,12 @@ public class View
     /// </summary>
     [JsonPropertyName("questions")]
     public string Questions { get; set; }
+
+    /// <summary>
+    /// Last synchronization with source table.
+    /// </summary>
+    [JsonPropertyName("lastSync")]
+    public DateTime LastSync { get; set; }
     
     /// <summary>
     /// Initializes a new instance of the <see cref="View"/> class.

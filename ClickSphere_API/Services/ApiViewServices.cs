@@ -46,15 +46,23 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         // insert view into CV_Views table
         if (result == 0)
         {
-            string insertQuery = $"INSERT INTO ClickSphere.Views (Id, Name, Description, Type) VALUES ('{view.Id}','{view.Name}','{view.Description}','V');";
+            string insertQuery = "INSERT INTO ClickSphere.Views (Id, Name, Description, Type, LastSync) " +
+                                $"VALUES ('{view.Id}','{view.Name}','{view.Description}','V','{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}');";
+
             int insertResult = await _dbService.ExecuteNonQuery(insertQuery);
             if (insertResult < 0)
-                return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = "Could not insert view into ClickSphere.Views table" };
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    ReasonPhrase = "Could not insert view into ClickSphere.Views table"
+                };
             else
                 return new HttpResponseMessage(HttpStatusCode.OK);
         }
         else
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = "Could not create view" };
+            return new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                ReasonPhrase = "Could not create view"
+            };
     }
 
     /// <summary>
@@ -84,7 +92,9 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         // insert view into ClickSphere.Views metadata table
         if (result == 0)
         {
-            string insertQuery = $"INSERT INTO ClickSphere.Views (Id, Name, Description, Type) VALUES ('{view.Id}','{view.Name}','{view.Description}','M');";
+            string insertQuery = "INSERT INTO ClickSphere.Views (Id, Name, Description, Type, LastSync) " +
+                                $"VALUES ('{view.Id}','{view.Name}','{view.Description}','M','{DateTime.Now}');";
+
             int insertResult = await _dbService.ExecuteNonQuery(insertQuery);
             if (insertResult < 0)
                 return Results.BadRequest("Could not insert view into ClickSphere.Views table");
@@ -290,10 +300,9 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
 
         // create view definition as CSV
         StringBuilder csv = new();
-        csv.AppendLine("ColumnName, ColumnDataType, ColumnDescription");
         foreach (var row in output)
         {
-            csv.AppendLine($"{row["ColumnName"]}, {row["DataType"]}, {row["Description"]}");
+            csv.AppendLine($"ColumnName: {row["ColumnName"]}, DataType: {row["DataType"]}, Description: '{row["Description"]}'");
         }
 
         return csv.ToString();
@@ -478,8 +487,8 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         query += ") ENGINE = ReplacingMergeTree(ID) ORDER BY ID SETTINGS allow_experimental_replacing_merge_with_cleanup = 1;";
         await _dbService.ExecuteNonQuery(query);
 
-        // call ReplaceUmlautsInView procedure on ODBC server
-        await ExecuteOdbc($"EXEC ReplaceUmlautsInView '{view}'");
+        // call CopyViewToTable procedure on ODBC server
+        await ExecuteOdbc($"EXEC CopyViewToTable '{view}'");
 
         // fill table with data
         query = $"INSERT INTO ClickSphere.{view}_TBL " +
@@ -495,7 +504,8 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
             Database = "ClickSphere",
             Query = $"SELECT * FROM ClickSphere.{view}_TBL",
             Type = "V",
-            Questions = ""
+            Questions = "",
+            LastSync = DateTime.Now
         });
 
         if (result != null && result.IsSuccessStatusCode)
@@ -508,12 +518,28 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
     /// Synchronize view table with ODBC table
     /// </summary>
     /// <param name="view">The view to synchronize</param>
+    /// <param name="force">Whether to force synchronization</param>
     /// <returns>The result of the synchronization</returns>
-    public async Task<IResult> SynchronizeView(string view)
+    public async Task<IResult> SynchronizeView(string view, bool force = false)
     {
         if (string.IsNullOrEmpty(view))
         {
             return Results.BadRequest("Invalid request");
+        }
+
+        string query = "";
+
+        // abort if LastSync is older than 24 hours
+        if (!force)
+        {
+            query = $"SELECT LastSync FROM ClickSphere.Views WHERE Id = '{view}'";
+            var result = await _dbService.ExecuteScalar(query);
+            // convert to DateTime
+            DateTime? lastSync = result != null ? DateTime.Parse(result.ToString()!) : null;
+            if (lastSync != null && lastSync > DateTime.Now.AddHours(-24))
+            {
+                return Results.BadRequest("View was synchronized less than 24 hours ago");
+            }
         }
 
         // check if system table
@@ -524,23 +550,47 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
 
         string odbcConnectionString = $"DSN={ODBC_DSN};Uid={ODBC_User};Pwd={ODBC_Password};Database={ODBC_Database};";
 
-        // synchronize deleted rows
-        string query = $"SELECT ID FROM ClickSphere.{view}_TBL";
-        IList<string> ids = await _dbService.ExecuteQuery(query) ?? [];
-
-        query = $"SELECT ID FROM odbc('{odbcConnectionString}', '', '{view}_CH')";
-        IList<string> odbcIds = await _dbService.ExecuteQuery(query) ?? [];
-
-        var idsToDelete = ids.Except(odbcIds).ToList();
-        if (idsToDelete.Count > 0)
+        // call CopyViewToTable procedure on ODBC server
+        try
         {
-            query = $"ALTER TABLE ClickSphere.{view}_TBL DELETE WHERE ID IN ({string.Join(",", idsToDelete.Select(id => $"'{id}'"))});";
-            await _dbService.ExecuteNonQuery(query);
+            await ExecuteOdbc($"EXEC CopyViewToTable '{view}'");
+        }
+        catch (Exception e)
+        {
+            return Results.BadRequest(e.Message);
+        }
+
+        try
+        {
+            // synchronize deleted rows
+            query = $"SELECT ID FROM ClickSphere.{view}_TBL";
+            IList<string> ids = await _dbService.ExecuteQuery(query) ?? [];
+
+            query = $"SELECT ID FROM odbc('{odbcConnectionString}', '', '{view}_CH')";
+            IList<string> odbcIds = await _dbService.ExecuteQuery(query) ?? [];
+
+            var idsToDelete = ids.Except(odbcIds).ToList();
+            if (idsToDelete.Count > 0)
+            {
+                query = $"ALTER TABLE ClickSphere.{view}_TBL DELETE WHERE ID IN ({string.Join(",", idsToDelete.Select(id => $"'{id}'"))})";
+                try
+                {
+                    await _dbService.ExecuteNonQuery(query);
+                }
+                catch (Exception e)
+                {
+                    return Results.BadRequest(e.Message);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            return Results.BadRequest(e.Message);
         }
 
         // execute insert query
         query = $"INSERT INTO ClickSphere.{view}_TBL " +
-                $"SELECT * FROM odbc('{odbcConnectionString}', '', '{view}_CH');";
+                $"SELECT * FROM odbc('{odbcConnectionString}', '', '{view}_CH')";
 
         try
         {
@@ -552,8 +602,20 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
         }
 
         // call OPTIMIZE TABLE to delete outdated rows
-        query = $"OPTIMIZE TABLE ClickSphere.{view}_TBL FINAL CLEANUP;";
+        query = $"OPTIMIZE TABLE ClickSphere.{view}_TBL FINAL CLEANUP";
 
+        try
+        {
+            await _dbService.ExecuteNonQuery(query);
+        }
+        catch (Exception e)
+        {
+            return Results.BadRequest(e.Message);
+        }
+
+        // update LastSync in ClickSphere.Views
+        string isoDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        query = $"ALTER TABLE ClickSphere.Views UPDATE LastSync = '{isoDate}' WHERE Id = '{view}'";
         try
         {
             await _dbService.ExecuteNonQuery(query);
@@ -593,101 +655,14 @@ public class ApiViewServices(IDbService dbService, IConfiguration configuration)
 
     private async Task<int> ExecuteOdbc(string sql)
     {
-        string connectionString = $"DSN={ODBC_DSN};UID={ODBC_User};PWD={ODBC_Password};";
+        string connectionString = $"DSN={ODBC_DSN};UID={ODBC_User};PWD={ODBC_Password};Database={ODBC_Database};";
         using OdbcConnection connection = new(connectionString);
+        connection.ConnectionTimeout = 600;
         connection.Open();
-        using OdbcCommand command = new(sql, connection);
+        using OdbcCommand command = new(sql, connection)
+        {
+            CommandTimeout = 600
+        };
         return await command.ExecuteNonQueryAsync();
     }
-
-    // private Stylesheet CreateExcelStyleSheet(WorkbookPart workbookPart)
-    // {
-    //     var stylesheet = new Stylesheet();
-
-    //     // Create fonts
-    //     var fonts = new Fonts { Count = 2 };
-    //     fonts.Append(new Font()); // Default font
-    //     fonts.Append(
-    //         new Font(
-    //             new Bold(),
-    //             new FontSize { Val = 11 },
-    //             new Color { Rgb = new HexBinaryValue { Value = "000000" } }
-    //         )
-    //     ); // Bold font for headers
-    //     stylesheet.Fonts = fonts;
-
-    //     // Create fills
-    //     var fills = new Fills { Count = 3 };
-    //     fills.Append(new Fill { PatternFill = new PatternFill { PatternType = PatternValues.None } }); // Index 0
-    //     fills.Append(new Fill { PatternFill = new PatternFill { PatternType = PatternValues.Gray125 } }); // Index 1
-    //     fills.Append(
-    //         new Fill(
-    //             new PatternFill
-    //             {
-    //                 PatternType = PatternValues.Solid,
-    //                 ForegroundColor = new ForegroundColor { Rgb = "DDEBF7" }, // Light blue header
-    //                 BackgroundColor = new BackgroundColor { Indexed = 64 }
-    //             }
-    //         )
-    //     ); // Index 2 - Header fill
-    //     stylesheet.Fills = fills;
-
-    //     // Create borders
-    //     var borders = new Borders { Count = 2 };
-    //     borders.Append(new Border()); // Default border
-    //     borders.Append(
-    //         new Border(
-    //             new LeftBorder { Style = BorderStyleValues.Thin },
-    //             new RightBorder { Style = BorderStyleValues.Thin },
-    //             new TopBorder { Style = BorderStyleValues.Thin },
-    //             new BottomBorder { Style = BorderStyleValues.Thin }
-    //         )
-    //     ); // Border for cells
-    //     stylesheet.Borders = borders;
-
-    //     // Create cell formats
-    //     var cellFormats = new CellFormats { Count = 4 };
-    //     cellFormats.Append(new CellFormat()); // Default format (0)
-
-    //     // Regular cell with border (1)
-    //     cellFormats.Append(
-    //         new CellFormat
-    //         {
-    //             FontId = 0,
-    //             FillId = 0,
-    //             BorderId = 1,
-    //             ApplyBorder = true
-    //         }
-    //     );
-
-    //     // Header cell with border and fill (2)
-    //     cellFormats.Append(
-    //         new CellFormat
-    //         {
-    //             FontId = 1,
-    //             FillId = 2,
-    //             BorderId = 1,
-    //             ApplyFill = true,
-    //             ApplyFont = true,
-    //             ApplyBorder = true,
-    //             Alignment = new Alignment { Horizontal = HorizontalAlignmentValues.Center }
-    //         }
-    //     );
-
-    //     // Date cell format (3)
-    //     cellFormats.Append(
-    //         new CellFormat
-    //         {
-    //             FontId = 0,
-    //             FillId = 0,
-    //             BorderId = 1,
-    //             ApplyBorder = true,
-    //             NumberFormatId = 14, // Date format
-    //             ApplyNumberFormat = true
-    //         }
-    //     );
-
-    //     stylesheet.CellFormats = cellFormats;
-    //     return stylesheet;
-    // }
 }

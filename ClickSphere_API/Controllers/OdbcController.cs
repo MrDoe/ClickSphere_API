@@ -71,10 +71,11 @@ public class OdbcController(IApiViewService viewService) : ControllerBase
     /// Synchronize a view from the ODBC connection with ClickHouse.
     /// </summary>
     /// <param name="view">The view to synchronize.</param>
+    /// <param name="force">Whether to force synchronization.</param>
     /// <returns>The result of the synchronization.</returns>
     [HttpGet]
     [Route("/odbc/synchronize")]
-    public async Task<IResult> SynchronizeView(string view)
+    public async Task<IResult> SynchronizeView(string view, bool force = false)
     {
         if(string.IsNullOrEmpty(view))
         {
@@ -84,7 +85,7 @@ public class OdbcController(IApiViewService viewService) : ControllerBase
         IResult result;       
         try
         {
-            result = await _viewService.SynchronizeView(view);
+            result = await _viewService.SynchronizeView(view, false);
         }
         catch (Exception e)
         {
