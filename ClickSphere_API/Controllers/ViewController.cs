@@ -368,7 +368,7 @@ public class ViewController(IApiViewService viewServices, IDbService dbService) 
 
         // Write header row
         buffer.AppendLine("sep=;"); // Excel-specific separator hint
-        buffer.AppendLine(string.Join(";", columns));
+        buffer.AppendLine("\"" + string.Join("\";\"", columns) + "\"");
 
         // Track dates to avoid repeated parsing of identical values
         var dateCache = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -377,16 +377,30 @@ public class ViewController(IApiViewService viewServices, IDbService dbService) 
         // Process data
         await foreach (var rowDict in DbService.ExecuteQueryAsStream(query))
         {
-            // Build row as we go rather than using string.Join
-            bool first = true;
+            // Build row data
+            bool isFirst = true;
+            bool isLast = false;
+            var lastColumn = columns.Last();
+
             foreach (var column in columns)
             {
-                if (!first) buffer.Append(';');
-                first = false;
+                if (!isFirst)
+                {
+                    buffer.Append("\";\"");
+                }
+                else if (isFirst)
+                {
+                    buffer.Append('\"');
+                }
+                
+                isFirst = false;
+                isLast = column == lastColumn;
 
                 if (rowDict.TryGetValue(column, out var value) && value != null)
                 {
                     string strValue = value.ToString() ?? string.Empty;
+                    strValue = EscapeCsvValue(strValue);
+                    
                     // Handle dates with caching for repeating values
                     if (value is DateTime || TryIdentifyDateString(strValue))
                     {
@@ -410,19 +424,15 @@ public class ViewController(IApiViewService viewServices, IDbService dbService) 
                         }
                     }
                     else
-                    {
-                        // Escape special characters if needed
-                        if (strValue.Contains(';') || strValue.Contains('\n') || strValue.Contains('"'))
-                        {
-                            buffer.Append('"').Append(strValue.Replace("\"", "\"\"")).Append('"');
-                        }
-                        else
-                        {
-                            buffer.Append(strValue);
-                        }
+                    {    
+                        buffer.Append(strValue);
                     }
                 }
             }
+            
+            if(isLast)
+                buffer.Append('\"');
+            
             buffer.AppendLine();
 
             ++rowCount;
@@ -476,5 +486,10 @@ public class ViewController(IApiViewService viewServices, IDbService dbService) 
         {
             return null;
         }
+    }
+
+    private static string EscapeCsvValue(string value)
+    {
+        return value.Replace("\"", "'").Replace(";", ",").Replace(" \n", "\n").Replace("“","'");
     }
 }
