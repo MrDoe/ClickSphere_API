@@ -206,8 +206,8 @@ public class ViewController(IApiViewService viewServices, IDbService dbService) 
         // Use EPPlus with streaming mode for large files
         using var package = new ExcelPackage();
         package.Workbook.CalcMode = ExcelCalcMode.Manual;
-        package.Workbook.Properties.Manager = string.Empty;
-        package.Workbook.Properties.Company = string.Empty;
+        package.Workbook.Properties.Manager = "";
+        package.Workbook.Properties.Company = "";
         package.Compression = CompressionLevel.BestSpeed;
         var worksheet = package.Workbook.Worksheets.Add(fileName);
 
@@ -259,7 +259,7 @@ public class ViewController(IApiViewService viewServices, IDbService dbService) 
                     // get value from rowDict
                     if (rowDict.TryGetValue(columns[c], out var value) && value != null)
                     {
-                        string strValue = value.ToString() ?? string.Empty;
+                        string strValue = value.ToString() ?? "";
                         // Handle dates with caching for repeating values
                         if (value is DateTime || TryIdentifyDateString(strValue))
                         {
@@ -333,163 +333,134 @@ public class ViewController(IApiViewService viewServices, IDbService dbService) 
     /// <summary>
     /// Export to CSV file
     /// </summary>
-    /// <param name="b64query">The view query to export</param>
-    /// <param name="viewId">The viewId to get the data from</param>
-    /// <param name="fileName">The name of the file</param>
-    /// <returns>The CSV file as stream</returns>
     [HttpGet]
     [Route("/exportToCsv")]
     public async Task ExportToCsv(string b64query, string viewId, string fileName)
     {
         if (string.IsNullOrEmpty(b64query) || string.IsNullOrEmpty(viewId) || string.IsNullOrEmpty(fileName))
-        {
             throw new ArgumentNullException("b64query, viewId or fileName is null or empty");
-        }
 
         string query = Encoding.UTF8.GetString(Convert.FromBase64String(b64query));
 
-        // Get column names before processing data
         var columns = (await ViewServices.GetViewColumns("ClickSphere", viewId, false))
             .Select(c => c.ColumnName)
             .Where(name => name != null)
-            .Select(name => name!)
             .ToList();
 
-        // Setup response headers for CSV file download
         Response.ContentType = "text/csv";
         Response.Headers.Append("Content-Disposition", $"attachment; filename=\"{fileName}\"");
 
-        // Use a buffered approach with StringBuilder for better performance
-        const int batchSize = 1000;
-        var buffer = new StringBuilder(batchSize * 100); // Pre-allocate reasonable size
+        const int batchSize = 50000;
+        var batch = new List<string>(batchSize);
+        int currentBatchCount = 0;
 
-        // Use a stream writer with appropriate buffer size
-        await using var writer = new StreamWriter(Response.Body, Encoding.Latin1, bufferSize: 100000, leaveOpen: true);
-
-        // Write header row
-        buffer.AppendLine("sep=;"); // Excel-specific separator hint
-        buffer.AppendLine("\"" + string.Join("\";\"", columns) + "\"");
-
-        // Track dates to avoid repeated parsing of identical values
+        // date cache for last dates
         var dateCache = new Dictionary<string, string>(StringComparer.Ordinal);
-        int rowCount = 0;
+        const int maxDateCacheSize = batchSize;
 
-        // Process data
+        await using var writer = new StreamWriter(Response.Body, Encoding.Latin1, bufferSize: 1048576, leaveOpen: true);
+
+        // Write headers
+        await writer.WriteLineAsync("sep=;");
+        await writer.WriteLineAsync($"\"{string.Join("\";\"", columns)}\"");
+
+        var sb = new StringBuilder();
         await foreach (var rowDict in DbService.ExecuteQueryAsStream(query))
         {
-            // Build row data
-            bool isFirst = true;
-            bool isLast = false;
-            var lastColumn = columns.Last();
-
-            foreach (var column in columns)
+            sb.Clear();
+            sb.Append('"');
+            
+            for (int i = 0; i < columns.Count; ++i)
             {
-                if (!isFirst)
-                {
-                    buffer.Append("\";\"");
-                }
-                else if (isFirst)
-                {
-                    buffer.Append('\"');
-                }
-                
-                isFirst = false;
-                isLast = column == lastColumn;
+                var column = columns[i];
 
-                if (rowDict.TryGetValue(column, out var value) && value != null)
+                if (!rowDict.TryGetValue(column, out var value) || value == null)
                 {
-                    string strValue = value.ToString() ?? string.Empty;
-                    strValue = EscapeCsvValue(strValue);
-                    
-                    // Handle dates with caching for repeating values
-                    if (value is DateTime || TryIdentifyDateString(strValue))
+                    sb.Append("\";");
+                    continue;
+                }
+                else
+                {
+                    string strValue;
+
+                    // use date cache for repeating dates to avoid parsing
+                    if(dateCache.TryGetValue(value.ToString() ?? "", out strValue))
                     {
-                        if (dateCache.TryGetValue(strValue, out var formattedDate))
-                        {
-                            buffer.Append(formattedDate);
-                        }
-                        else
-                        {
-                            var date = ParseDateTimeString(strValue);
-                            if (date.HasValue)
-                            {
-                                var formatted = date.Value.ToString("dd.MM.yyyy HH:mm");
-                                dateCache[strValue] = formatted;
-                                buffer.Append(formatted);
-                            }
-                            else
-                            {
-                                buffer.Append(strValue);
-                            }
-                        }
+                        strValue = dateCache[value.ToString() ?? ""];
                     }
                     else
-                    {    
-                        buffer.Append(strValue);
+                    {
+                        strValue = value.ToString() ?? "";
+
+                        // conversion for ClickHouse date format
+                        if (TryIdentifyDateString(strValue))
+                        {
+                            var parseResult = Pattern.Parse(strValue);
+                            if (parseResult.Success)
+                            {
+                                var date = parseResult.Value.LocalDateTime.ToDateTimeUnspecified();
+                                strValue = date.ToString("dd.MM.yyyy HH:mm");
+                                dateCache[value.ToString() ?? ""] = strValue;
+                            }
+                        }
+                    }
+                    sb.Append(EscapeCsvValue(strValue));
+                    sb.Append("\";\"");
+                    
+                    // clear cache if it has more too many entries
+                    if (dateCache.Count > maxDateCacheSize)
+                    {
+                        dateCache.Clear();
                     }
                 }
             }
-            
-            if(isLast)
-                buffer.Append('\"');
-            
-            buffer.AppendLine();
 
-            ++rowCount;
+            sb.Length -= 2; // Remove last ";\""
+            batch.Add(sb.ToString());
+            currentBatchCount++;
 
-            // Write in batches to avoid excessive memory usage
-            if (rowCount % batchSize == 0)
+            if (currentBatchCount >= batchSize)
             {
-                await writer.WriteAsync(buffer);
-                buffer.Clear();
-
-                // Periodically clean date cache if it grows too large
-                if (dateCache.Count > 10000)
-                {
-                    dateCache.Clear();
-                }
+                await writer.WriteAsync(string.Join(Environment.NewLine, batch));
+                await writer.FlushAsync();
+                batch.Clear();
+                currentBatchCount = 0;
             }
         }
 
-        // Write any remaining data
-        if (buffer.Length > 0)
+        // Write remaining lines
+        if (currentBatchCount > 0)
         {
-            await writer.WriteAsync(buffer);
+            await writer.WriteAsync(string.Join(Environment.NewLine, batch));
+            await writer.FlushAsync();
         }
-
-        // Explicitly flush the writer
-        await writer.FlushAsync();
     }
 
     private bool TryIdentifyDateString(string value)
     {
-        // Quick check to avoid unnecessary date parsing attempts
-        return value.Length >= 10 &&
-               value.Length <= 30 &&
-               char.IsDigit(value[0]) &&
-               (value.Contains('/') || value.Contains('-'));
+        return value.Length >= 10 && value.Length <= 30 &&
+            char.IsDigit(value[0]) && (value.Contains('-') || value.Contains('/'));
     }
 
     private static readonly OffsetDateTimePattern Pattern =
-    OffsetDateTimePattern.CreateWithInvariantCulture("MM/dd/yyyy HH:mm:ss +o<HH:mm>");
+        OffsetDateTimePattern.CreateWithInvariantCulture("MM/dd/yyyy HH:mm:ss +o<HH:mm>");
+
+    private static string EscapeCsvValue(string value)
+    {
+        if (string.IsNullOrEmpty(value) || value.IndexOfAny(new[] { '"', ';', '\n', '“' }) == -1)
+            return value;
+
+        return value.Replace("\"", "\"\"")
+                    .Replace(";", ",")
+                    .Replace(" \n", "\n")
+                    .Replace("“", "'");
+    }
 
     // parse date from extended iso to localdatetime
     private DateTime? ParseDateTimeString(string input)
     {
-        try
-        {
-            // convert to DateTime with NodaTime
-            var result = Pattern.Parse(input);
-            return result.Value.LocalDateTime.ToDateTimeUnspecified();
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string EscapeCsvValue(string value)
-    {
-        return value.Replace("\"", "'").Replace(";", ",").Replace(" \n", "\n").Replace("“","'");
+        // convert to DateTime with NodaTime
+        var result = Pattern.Parse(input);
+        return result.Value.LocalDateTime.ToDateTimeUnspecified();
     }
 }
