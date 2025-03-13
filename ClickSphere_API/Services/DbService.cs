@@ -385,7 +385,7 @@ public class DbService : IDbService
             }
         }
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String, Role String) ENGINE = MergeTree() PRIMARY KEY(Id)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String, Role String, Language String) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
         // check if default user in ClickSphere.Users exists
@@ -401,7 +401,7 @@ public class DbService : IDbService
 
             if (!string.IsNullOrEmpty(uid))
             {
-                query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, FirstName, LastName, Email, Phone, Department, Role) VALUES ('{uid}', 'default', '', 'Default', 'User', '', '', 'ClickHouse', 'default')";
+                query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, FirstName, LastName, Email, Phone, Department, Role, Language) VALUES ('{uid}', 'default', '', 'Default', 'User', '', '', 'ClickHouse', 'default', 'en-US')";
                 await ExecuteNonQuery(query);
             }
         }

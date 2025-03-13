@@ -59,4 +59,10 @@ public class UserConfig
     /// </summary>
     [JsonPropertyName("role")]
     public string? Role { get; set; }
+
+    /// <summary>
+    /// Gets or sets the language preference of the user.
+    /// </summary>
+    [JsonPropertyName("language")]
+    public string? Language { get; set; }
 }

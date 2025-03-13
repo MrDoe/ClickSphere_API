@@ -86,7 +86,8 @@ public class UserController(IApiUserService userService) : ControllerBase
             Phone = user.Phone,
             Department = user.Department,
             LDAP_User = user.LDAP_User,
-            Role = "User"
+            Role = "User",
+            Language = user.Language
         });
 
         if (result.IsSuccessful)

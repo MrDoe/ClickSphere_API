@@ -44,7 +44,7 @@ public class ApiUserService(IDbService dbService) : IApiUserService
         var userId = result!.ToString();
 
         // create the user's configuration
-        query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department) VALUES ('{userId}', '{username}', '', '', '', '', '', '')";
+        query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department, Language) VALUES ('{userId}', '{username}', '', '', '', '', '', '', 'en-US')";
         await _dbService.ExecuteNonQuery(query);
 
         // check if insert was successful
@@ -110,7 +110,7 @@ public class ApiUserService(IDbService dbService) : IApiUserService
     /// <returns>A list of User objects representing the users in the table</returns>
     public async Task<List<UserConfig>> GetUsers()
     {
-        string query = "SELECT toString(Id) as Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department, Role from ClickSphere.Users";
+        string query = "SELECT toString(Id) as Id, UserName, LDAP_User, Email, FirstName, LastName, Phone, Department, Role, Language from ClickSphere.Users";
         var result = await _dbService.ExecuteQueryDictionary(query);
 
         List<UserConfig> users = [];
@@ -126,7 +126,8 @@ public class ApiUserService(IDbService dbService) : IApiUserService
                 LastName = row["LastName"]?.ToString()!,
                 Phone = row["Phone"]?.ToString()!,
                 Department = row["Department"]?.ToString()!,
-                Role = row["Role"]?.ToString()!
+                Role = row["Role"]?.ToString()!,
+                Language = row["Language"]?.ToString()!
             };
 
             users.Add(user);
@@ -201,7 +202,8 @@ public class ApiUserService(IDbService dbService) : IApiUserService
             Email = row["Email"].ToString()!,
             Phone = row["Phone"].ToString()!,
             Department = row["Department"].ToString()!,
-            Role = row["Role"].ToString()!
+            Role = row["Role"].ToString()!,
+            Language = row["Language"].ToString()!
         }).FirstOrDefault();
 
         return userConfig;
@@ -222,7 +224,8 @@ public class ApiUserService(IDbService dbService) : IApiUserService
                        $"Email = '{user.Email}'," +
                        $"Phone = '{user.Phone}'," +
                        $"Department = '{user.Department}'," +
-                       $"Role = '{user.Role}'" +
+                       $"Role = '{user.Role}'," +
+                       $"Language = '{user.Language}' " +
                        $"WHERE Id = '{user.Id}'";
         var nReturn = await _dbService.ExecuteNonQuery(query);
 

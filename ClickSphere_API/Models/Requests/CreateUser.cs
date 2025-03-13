@@ -43,4 +43,9 @@ public class CreateUserRequest
     /// Gets or sets the department of the user.
     /// </summary>
     public string? Department { get; set; }
+
+    /// <summary>
+    /// Gets or sets the language of the user.
+    /// </summary>
+    public string? Language { get; set; } = "en-US"; // Default to English
 }
