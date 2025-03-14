@@ -23,4 +23,10 @@ public class LoginRequestResponse
     /// Gets or sets the refresh token.
     /// </summary>
     public string? refreshToken { get; set; }
+
+    /// <summary>
+    /// Gets or sets the language of the user.
+    /// </summary>
+    /// <value>The language of the user.</value>
+    public string? language { get; set; }
 }

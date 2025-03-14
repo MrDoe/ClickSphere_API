@@ -59,4 +59,11 @@ public interface IApiUserService
     /// <param name="user">The updated user configuration.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task<Result> UpdateUser(UserConfig user);
+
+    /// <summary>
+    /// Retrieves the user ID for the specified username.
+    /// </summary>
+    /// <param name="username">The username of the user.</param>
+    /// <returns>A task representing the asynchronous operation. The task result contains the user ID if found; otherwise, null.</returns>
+    Task<Guid> GetUserId(string username);
 }

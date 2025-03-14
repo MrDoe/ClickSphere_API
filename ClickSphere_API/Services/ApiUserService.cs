@@ -210,6 +210,22 @@ public class ApiUserService(IDbService dbService) : IApiUserService
     }
 
     /// <summary>
+    /// Get user id from username
+    /// </summary>
+    /// <param name="username">The username of the user</param>
+    /// <returns>The user id</returns>
+    public async Task<Guid> GetUserId(string username)
+    {
+        string query = $"SELECT Id FROM ClickSphere.Users WHERE UserName = '{username}'";
+        var result = await _dbService.ExecuteScalar(query);
+        
+        if (result is DBNull)
+            throw new Exception("User not found");
+
+        return Guid.TryParse(result!.ToString()!, out var userId) ? userId : Guid.Empty;
+    }
+
+    /// <summary>
     /// This method updates the user configuration in ClickSphere.Users
     /// </summary>
     /// <param name="user">The user configuration to update</param>
