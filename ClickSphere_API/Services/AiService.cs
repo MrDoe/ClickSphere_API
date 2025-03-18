@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using ClickSphere_API.Models;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Tools;
@@ -255,6 +256,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
                     responseText = responseText[(sqlIndex + 6)..endSqlIndex];
                 }
                 
+                responseText = responseText.Replace("```", "");
                 responseText = responseText.Replace("\\n", " ");
 
                 // get the query after the first SELECT until the first ';' character
@@ -274,6 +276,14 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
 
                 // remove semicolon
                 responseText = responseText.TrimEnd(';');
+
+                // replace all newlines with spaces
+                responseText = responseText.Replace("\n", " ");
+                responseText = responseText.Replace("\r", "");
+                responseText = responseText.Replace("\t", " ");
+                
+                // replace multiple spaces with a single space
+                responseText = Regex.Replace(responseText, @"\s+", " ");
 
                 if (useEmbeddings)
                 {
@@ -549,6 +559,7 @@ Precisely follow the instructions given to you.
 - You are an expert for biosample and medical data.
 - Be precise and concise and follow the instructions given to you.
 - Output the column description only, no bullet points or numbered lists.
+- Keep the column description as short as possible.
 """;
 
         string prompt = """
