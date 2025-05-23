@@ -401,7 +401,40 @@ public class DbService : IDbService
 
             if (!string.IsNullOrEmpty(uid))
             {
-                query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, FirstName, LastName, Email, Phone, Department, Role, Language) VALUES ('{uid}', 'default', '', 'Default', 'User', '', '', 'ClickHouse', 'default', 'en-US')";
+                query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, FirstName, LastName, Email, Phone, Department, Role, Language) VALUES ('{uid}', 'default', '', 'Default', 'User', '', '', 'ClickHouse', 'Admin', 'en-US')";
+                await ExecuteNonQuery(query);
+            }
+        }
+
+        // check if admin user in ClickSphere.Users exists
+        query = "SELECT UserName FROM ClickSphere.Users WHERE UserName = 'admin'";
+        result = await ExecuteScalar(query);
+
+        if (result is DBNull)
+        {
+            // create admin user
+            query = "SELECT id FROM system.users WHERE name = 'admin'";
+            var guid = await ExecuteScalar(query);
+            string? uid = guid!.ToString();
+            if (string.IsNullOrEmpty(uid))
+            {
+                query = "CREATE USER admin IDENTIFIED WITH plaintext_password BY 'ChangeMe!11'";
+                await ExecuteNonQuery(query);
+
+                query = "GRANT SHOW TABLES, SELECT ON ClickSphere.* TO admin";
+                await ExecuteNonQuery(query);
+
+                query = "GRANT Admin TO admin";
+                await ExecuteNonQuery(query);
+
+                query = "SELECT id FROM system.users WHERE name = 'admin'";
+                guid = await ExecuteScalar(query);
+                uid = guid!.ToString();
+            }
+
+            if (!string.IsNullOrEmpty(uid))
+            {
+                query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, FirstName, LastName, Email, Phone, Department, Role, Language) VALUES ('{uid}', 'admin', '', 'System', 'Administrator', '', '', 'ClickHouse', 'Admin', 'en-US')";
                 await ExecuteNonQuery(query);
             }
         }
