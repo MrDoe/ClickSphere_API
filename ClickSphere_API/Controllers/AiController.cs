@@ -3,26 +3,80 @@ using Microsoft.AspNetCore.Authorization;
 using ClickSphere_API.Services;
 using ClickSphere_API.Models.Requests;
 using ClickSphere_API.Models;
+using ClickSphere_API.Tools;
 namespace ClickSphere_API.Controllers;
 
 /// <summary>
 /// Interface to the Ollama AI service.
 /// </summary>
 [ApiController]
-public class AiController(IAiService AiService) : ControllerBase
+public class AiController(IAiService AiService, IDbService DbService, IRagService RagService) : ControllerBase
 {
+    /// <summary>
+    /// Get available models from Ollama
+    /// </summary>
+    /// <returns>List of available models</returns>
+    [Route("/getModels")]
+    [HttpGet]
+    public async Task<IList<string>> GetModels()
+    {
+        // Call the Ollama API
+        IList<string> response = await AiService.GetModelsAsync();
+        return response;
+    }
+
+    /// <summary>
+    /// Pull a specific model from Ollama
+    /// </summary>
+    /// <param name="model">The model to pull</param>
+    /// <returns>The model</returns>
+    [Route("/pullModel")]
+    [HttpGet]
+    public async Task<string> PullModel(string model)
+    {
+        // Call the Ollama API
+        Result response = await AiService.PullModelAsync(model);
+        return response.Output;
+    }
+
     /// <summary>
     /// Ask the AI a question. Call the Ollama API
     /// </summary>
-    /// <param name="question" example="How can I create a new table?">The question to ask.</param>
+    /// <param name="request">The request to ask a question.</param>
     /// <returns>The answer to the question.</returns>
     [Authorize]
     [Route("/ask")]
     [HttpPost]
-    public async Task<string> Ask(string question)
+    public async Task<string> Ask([FromBody] TextRequest request)
     {
+        string question = request.Text;
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            throw new ArgumentException("Question is empty");
+        }
+
         // Call the Ollama API
         string response = await AiService.Ask(question);
+        return response;
+    }
+
+    /// <summary>
+    /// Use the AI to translate a text into English.
+    /// </summary>
+    /// <param name="request">The request to translate a text.</param>
+    /// <returns>The translated text.</returns>
+    [Route("/translate")]
+    [HttpPost]
+    public async Task<string> Translate([FromBody] TextRequest request)
+    {
+        string text = request.Text;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new ArgumentException("Text is empty");
+        }
+
+        // Call the Ollama API
+        string response = await AiService.Translate(text);
         return response;
     }
 
@@ -36,31 +90,21 @@ public class AiController(IAiService AiService) : ControllerBase
     [HttpPost]
     public async Task<string> GenerateQuery(GenerateQueryRequest request)
     {
-        if(request.Question == null || request.Database == null || request.Table == null)
+        if (request.Question == null || request.Database == null || request.Table == null)
         {
             return "Invalid request";
         }
 
-        // Call the Ollama API
-        string response = await AiService.GenerateQuery(request.Question, request.Database, request.Table);        
-        return response;
-    }
+        if (request.UseEmbeddings)
+        {
+            // Get similar queries from embeddings
+            var queries = await RagService.GetSimilarQueries(request.Question, request.Database, request.Table);
+            if (queries.Count > 0)
+                return queries[0];
+        }
 
-    /// <summary>
-    /// Generate a SQL query and execute it on the specified database.
-    /// </summary>
-    /// <param name="question" example="Calculate the average traveling time (in minutes) for all trips with a pickup date between 2015-01-01 and 2015-12-31.">The question to ask.</param>
-    /// <param name="database" example="default">The database to execute the query on.</param>
-    /// <param name="table" example="trips">The table to ask the question about.</param>
-    /// <returns>The result of the query execution.</returns>
-    [Authorize]
-    [Route("/generateAndExecuteQuery")]
-    [HttpPost]
-    public async Task<string> GenerateAndExecuteQuery(string question, string database, string table)
-    {
-        // Call the Ollama API
-        string response = await AiService.GenerateAndExecuteQuery(question, database, table);
-        return response;
+        // Call the Ollama API to get response
+        return await AiService.GenerateQuery(request.Question, request.Database, request.Table, request.UseEmbeddings);
     }
 
     /// <summary>
@@ -90,8 +134,7 @@ public class AiController(IAiService AiService) : ControllerBase
     public async Task<IDictionary<string, string>> GetColumnDescriptions(string database, string table)
     {
         // Call the Ollama API
-        IDictionary<string, string> response = await AiService.GetColumnDescriptions(database, table);
-        return response;
+        return await AiService.GetColumnDescriptions(database, table);
     }
 
     /// <summary>
@@ -101,24 +144,32 @@ public class AiController(IAiService AiService) : ControllerBase
     [Authorize]
     [Route("/getAiConfig")]
     [HttpGet]
-    public AiConfig GetAiConfig()
+    public AiConfig GetAiConfig(string type)
     {
         // Call the Ollama API
-        AiConfig response = AiService.GetAiConfig();
+        AiConfig response = DbService.GetAiConfig(type);
         return response;
     }
 
     /// <summary>
     /// Set the system configuration.
     /// </summary>
-    /// <param name="config">The system configuration.</param>
+    /// <param name="request">The request to set the system configuration.</param>
     /// <returns>The system configuration.</returns>
     [Authorize]
     [Route("/setAiConfig")]
     [HttpPost]
-    public async Task SetAiConfig(AiConfig config)
+    public async Task SetAiConfig(SetAIConfigRequest request)
     {
+        if (request.Config == null)
+        {
+            throw new ArgumentException("Config is empty");
+        }
+
+        string type = request.Type;
+        AiConfig config = request.Config;
+
         // Call the Ollama API
-        await AiService.SetAiConfig(config);
+        await DbService.SetAiConfig(type, config);
     }
 }

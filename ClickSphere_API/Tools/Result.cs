@@ -18,9 +18,12 @@ public class Result(bool isSuccessful, string output)
     /// Creates a new instance of the <see cref="Result"/> class representing a successful operation.
     /// </summary>
     /// <returns>A new instance of the <see cref="Result"/> class with <see cref="IsSuccessful"/> set to true and <see cref="Output"/> set to "Success".</returns>
-    public static Result Ok()
+    public static Result Ok(string? output = "Success")
     {
-        return new Result(true, "Success");
+        if (output == null)
+            return new Result(true, "Success");
+        else
+            return new Result(true, output);
     }
 
     /// <summary>

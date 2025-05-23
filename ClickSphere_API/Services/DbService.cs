@@ -1,5 +1,10 @@
+using System.Configuration;
 using System.Reflection;
+using ClickSphere_API.Models;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.SignalR;
 using Octonica.ClickHouseClient;
+using Octonica.ClickHouseClient.Exceptions;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -11,6 +16,7 @@ public class DbService : IDbService
     private readonly ClickHouseConnectionStringBuilder? _connString;
     private string Host { get; set; }
     private ushort Port { get; set; }
+    private static bool _initialized = false;
 
     /// <summary>
     /// Constructor for the DbService class
@@ -43,11 +49,17 @@ public class DbService : IDbService
 
         try
         {
-            InitializeDatabase().Wait();
+            // do not execute if executed before
+            if (!_initialized)
+                InitializeDatabase().Wait();
         }
-        catch(Exception)
+        catch (Exception)
         {
             throw new Exception("Database server is not accessible! Please check, if it is running.\n");
+        }
+        finally
+        {
+            _initialized = true;
         }
     }
 
@@ -55,10 +67,13 @@ public class DbService : IDbService
     /// Create a connection to the ClickHouse database
     /// </summary>
     /// <returns>A ClickHouseConnection object that represents the connection to the database</returns>
-    private ClickHouseConnection CreateConnection()
+    public ClickHouseConnection CreateConnection()
     {
         if (_connString == null)
             throw new Exception("ClickHouse connection string is not valid");
+
+        // increate timeout to 5 minutes
+        _connString.CommandTimeout = 300;
 
         return new ClickHouseConnection(_connString.ConnectionString);
     }
@@ -105,7 +120,14 @@ public class DbService : IDbService
 
         while (await reader.ReadAsync())
         {
-            result.Add(reader.GetString(0));
+            if (reader.GetFieldType(0) == typeof(string))
+            {
+                result.Add(reader.GetString(0));
+            }
+            else
+            {
+                result.Add(reader.GetValue(0)?.ToString() ?? string.Empty);
+            }
         }
         return result;
     }
@@ -137,6 +159,31 @@ public class DbService : IDbService
             result.Add(row);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Execute a query on the ClickHouse database
+    /// </summary>
+    /// <param name="query">The query to be executed</param>
+    /// <returns>An IAsyncEnumerable of dictionary that represents the result of the query</returns>
+    public async IAsyncEnumerable<Dictionary<string, object>> ExecuteQueryAsStream(string query)
+    {
+        using var connection = CreateConnection();
+        await connection.OpenAsync();
+        var command = connection.CreateCommand(query);
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var row = new Dictionary<string, object>();
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetValue(i).ToString() == "NaN")
+                    row[reader.GetName(i)] = "NaN";
+                else
+                    row[reader.GetName(i)] = reader.GetValue(i);
+            }
+            yield return row;
+        }
     }
 
     /// <summary>
@@ -181,10 +228,55 @@ public class DbService : IDbService
         while (await reader.ReadAsync())
         {
             var row = new T();
-            for (var i = 0; i < reader.FieldCount; i++)
+            for (int i = 0; i < reader.FieldCount; ++i)
             {
                 var property = typeof(T).GetProperty(reader.GetName(i));
-                property?.SetValue(row, reader.GetValue(i));
+                if (property != null)
+                {
+                    var value = reader.GetValue(i);
+                    if (value != DBNull.Value)
+                    {
+                        // Handle type conversion for nullable types
+                        if (Nullable.GetUnderlyingType(property.PropertyType) != null)
+                        {
+                            // Convert the value to the nullable's underlying type
+                            value = Convert.ChangeType(value, Nullable.GetUnderlyingType(property.PropertyType)!);
+                        }
+                        // Handle regular type conversion
+                        else if (value.GetType() != property.PropertyType)
+                        {
+                            //Handle DateTime conversion
+                            if (property.PropertyType == typeof(DateTime) && value is DateTimeOffset dto)
+                            {
+                                value = dto.DateTime;
+                            }
+                            else if (property.PropertyType == typeof(DateTime?) && value is DateTimeOffset dto2)
+                            {
+                                value = dto2.DateTime;
+                            }
+                            else if (property.PropertyType == typeof(DateTime) && value is string strValue && DateTime.TryParse(strValue, out var dateTimeValue))
+                            {
+                                value = dateTimeValue;
+                            }
+                            else if (property.PropertyType == typeof(DateTime?) && value is string strValue2 && DateTime.TryParse(strValue2, out var dateTimeValue2))
+                            {
+                                value = dateTimeValue2;
+                            }
+                            else if (property.PropertyType.IsEnum)
+                            {
+                                // Convert the value to the enum type
+                                value = Enum.ToObject(property.PropertyType, value);
+                            }
+                            else // Convert the value to the property type
+                                value = Convert.ChangeType(value, property.PropertyType);
+                        }
+                        property.SetValue(row, value);
+                    }
+                    else
+                    {
+                        property.SetValue(row, null);
+                    }
+                }
             }
             result.Add(row);
         }
@@ -202,6 +294,44 @@ public class DbService : IDbService
         await connection.OpenAsync();
         var command = connection.CreateCommand(query);
         return await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Execute bulk insert on the ClickHouse database
+    /// </summary>
+    /// <param name="database">The name of the database</param>
+    /// <param name="tableName">The name of the table</param>
+    /// <param name="columnNames">The names of the columns to insert</param>
+    /// <param name="data">The data to insert</param>
+    public async Task ExecuteBulkInsert(string database, string tableName, string[] columnNames,
+                                        IReadOnlyList<object[]?> data)
+    {
+        using var connection = CreateConnection();
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        try
+        {
+            await using var writer = await connection.CreateColumnWriterAsync(
+                $"INSERT INTO {database}.{tableName} ({string.Join(", ", columnNames)}) VALUES", default);
+
+            // split data into columns
+            var columnData = new List<object[]>();
+            for (int i = 0; i < columnNames.Length; ++i)
+            {
+                var column = new object[data.Count];
+                for (int j = 0; j < data.Count; ++j)
+                {
+                    column[j] = data[j]![i];
+                }
+                columnData.Add(column);
+            }
+
+            await writer.WriteTableAsync(columnData, data.Count, default);
+        }
+        catch (ClickHouseException e)
+        {
+            throw new Exception(e.Message);
+        }
     }
 
     /// <summary>
@@ -228,31 +358,34 @@ public class DbService : IDbService
         // get version from csproj file
         string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
 
-        string query = "SELECT Value FROM ClickSphere.Config WHERE Key = 'Version' and Section = 'ClickSphere'";
+        string query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
+        await ExecuteNonQuery(query);
+
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Config (Key String, Value String, Section String) ENGINE = MergeTree() PRIMARY KEY(Key, Section)";
+        await ExecuteNonQuery(query);
+
+        query = "SELECT Value FROM ClickSphere.Config WHERE Key = 'Version' and Section = 'ClickSphere'";
         object? result = await ExecuteScalar(query);
 
-        if(result is DBNull)
+        // create role 'Admin'
+        query = "CREATE ROLE IF NOT EXISTS Admin";
+        await ExecuteNonQuery(query);
+
+        if (result is DBNull)
         {
             query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('Version', '{version}', 'ClickSphere')";
             await ExecuteNonQuery(query);
         }
         else
         {
-            if(result != null && result.ToString() != version)
+            if (result != null && result.ToString() != version)
             {
-                query = $"UPDATE ClickSphere.Config SET Value = '{version}' WHERE Key = 'Version' and Section = 'ClickSphere'";
+                query = $"ALTER TABLE ClickSphere.Config UPDATE Value = '{version}' WHERE Key = 'Version' AND Section = 'ClickSphere'";
                 await ExecuteNonQuery(query);
-            }
-            else
-            {
-                return;
             }
         }
 
-        query = "CREATE DATABASE IF NOT EXISTS ClickSphere";
-        await ExecuteNonQuery(query);
-
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String, Role String) ENGINE = MergeTree() PRIMARY KEY(Id)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Users (Id UUID, UserName String, LDAP_User String, FirstName String, LastName String, Email String, Phone String, Department String, Role String, Language String) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
         // check if default user in ClickSphere.Users exists
@@ -268,83 +401,128 @@ public class DbService : IDbService
 
             if (!string.IsNullOrEmpty(uid))
             {
-                query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, FirstName, LastName, Email, Phone, Department, Role) VALUES ('{uid}', 'default', '', 'Default', 'User', '', '', 'ClickHouse', 'default')";
+                query = $"INSERT INTO ClickSphere.Users (Id, UserName, LDAP_User, FirstName, LastName, Email, Phone, Department, Role, Language) VALUES ('{uid}', 'default', '', 'Default', 'User', '', '', 'ClickHouse', 'default', 'en-US')";
                 await ExecuteNonQuery(query);
             }
         }
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views (Id String, Name String, Description String, Type String) ENGINE = MergeTree() PRIMARY KEY(Id)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Views " +
+                "(Id String, Name String, Description String, Type String, Questions String, LastSync DateTime) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.ViewColumns (Id UUID, Database String, ViewId String, ColumnName String, DataType String, ControlType String, Placeholder String, Sorter UInt32, Description String, Width UInt16) ENGINE = MergeTree() PRIMARY KEY(Database, ViewId, ColumnName)";
         await ExecuteNonQuery(query);
 
-        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Config (Key String, Value String, Section String) ENGINE = MergeTree() PRIMARY KEY(Key, Section)";
+        query = "CREATE TABLE IF NOT EXISTS ClickSphere.Embeddings (Id UUID, Question String, Database String, Table String, SQL_Query String, Embedding_Question Array(Float32)) ENGINE = MergeTree() PRIMARY KEY(Id)";
         await ExecuteNonQuery(query);
 
         // check if AI Configuration exists
-        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'AiConfig'";
+        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'RAGConfig'";
         result = await ExecuteScalar(query);
 
         if (result is DBNull)
         {
-            await InsertAiConfig();
+            await InsertAiConfig("RAGConfig");
+        }
+
+        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'Text2SQLConfig'";
+        result = await ExecuteScalar(query);
+
+        if (result is DBNull)
+        {
+            await InsertAiConfig("Text2SQLConfig");
         }
     }
 
     /// <summary>
     /// Insert the AI Configuration into the ClickSphere database
     /// </summary>
-    private async Task InsertAiConfig()
+    /// <param name="type">The type of AI Configuration</param>
+    private async Task InsertAiConfig(string type)
     {
-       // insert AI Configuration
-        string query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaUrl', 'http://localhost:11434', 'AiConfig')";
+        // insert AI Configuration
+        string query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaUrl', 'http://localhost:11434', '{type}')";
         await ExecuteNonQuery(query);
 
-        query = "INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaModel', 'codegemma', 'AiConfig')";
-        await ExecuteNonQuery(query);
+        string systemPrompt = "";
+        string modelName = "";
+        if (type == "Text2SQLConfig")
+        {
+            modelName = "gemma2:9b-instruct-q5_K_M";
+            systemPrompt =
+"""
+# IDENTITY and PURPOSE
 
-        string systemPrompt = 
-        """
-        # IDENTITY and PURPOSE
+Translate natural text in English or German to ClickHouse SQL queries (Text2SQL).
+Be an expert in ClickHouse SQL databases.
+Be an expert in clinical and medical data and terminology in German and English.
+Use ClickHouse SQL references, tutorials, and documentation to generate valid ClickHouse SQL queries.
 
-        Translate natural text in English or German to ClickHouse SQL queries (Text2SQL).
-        Be an expert in ClickHouse SQL databases.
-        Be an expert in clinical and medical data and terminology in German and English.
-        Use ClickHouse SQL references, tutorials, and documentation to generate valid ClickHouse SQL queries.
+# STEPS
 
-        # STEPS
+- Analyze the table schema and identify the columns needed. Use ColumnDescription only for understanding the containing data.
+- Use ColumnName **only** as provided in the table schema - don't modify it!
+- If possible, calculate columns needed for the query (e.g. Age from Birthday).
+- Analyze the question and identify the specific ClickHouse SQL instructions and functions needed.
+- Use only ClickHouse SQL functions and ClickHouse SQL data types.
+- Ensure the correct number of arguments and data types are used in functions.
+- Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
+- Write ClickHouse function names in camelCase format (e.g., toDate, toDateTime). Start function names with a lowercase letter.
+- Do not write any comments with dashes (--) in the query.
+- Translate diagnoses provided as text into the respective ICD-10 codes, if needed.
+- Split up diagnoses from the question into their respective words (e.g., 'lung cancer' -> '%lung%', '%cancer%').
+- Append 'If' (like countIf, sumIf, avgIf, etc.) to the function name if needed.
 
-        - Analyze the given table schema and identify the necessary columns. Use column descriptions to understand the expected data.
-        - Use only the columns provided in the table schema to generate the query.
-        - Analyze the question and identify the specific ClickHouse SQL instructions and functions needed.
-        - Use the ClickHouse SQL Reference to validate all possible ClickHouse SQL functions and data types.
-        - Generate a ClickHouse SQL query that accurately reflects the question and provides the desired output.
-        - Ensure all functions and data types used in the query are valid ClickHouse SQL functions and data types.
-        - Ensure the correct number of arguments and data types are used in functions.
-        - Ensure all column names in the query match exactly as written in the table schema.
-        - Write ClickHouse function names in camelCase format (e.g., toDate, toDateTime). Start function names with a lowercase letter.
-        - Do not write any comments with dashes (--) in the query.
-        - Translate diagnoses provided as text into the respective ICD-10 codes, if needed.
-        - Split up diagnoses from the question into their respective words (e.g., 'lung cancer' -> '%lung%', '%cancer%').
-        - Append 'If' (like countIf, sumIf, avgIf, etc.) to the function name if needed.
+# OUTPUT INSTRUCTIONS
 
-        # OUTPUT INSTRUCTIONS
+- Ask the user for clarification if the question is unclear or ambiguous.
+- Deny questions that require columns not present or not derivable from the table schema.
+- If an ClickHouse SQL query can be generated, output the SQL query only, without comments.
 
-        - Ask the user for clarification if the question is unclear or ambiguous.
-        - Deny questions that require columns not present or not calculatable from the table schema.
-        - If an ClickHouse SQL query can be generated, output the SQL query only without comments.
+# INPUT
 
-        # INPUT
-        - Table name: `[_TABLE_NAME_]`
-        - Table schema: `[_TABLE_SCHEMA_]`
+- Table name: `[_TABLE_NAME_]`
+- Table schema: `[_TABLE_SCHEMA_]`
 
-        # QUESTION
-        """;
+# QUESTION
+
+""";
+        }
+        else if (type == "RAGConfig")
+        {
+            modelName = "bge-m3";
+            systemPrompt =
+"""
+# IDENTITY and PURPOSE
+
+You are a pathologist and expert for medical data, diagnoses, abbreviations and pathological findings in German and English.
+Your task is to find the best matching data sets for keywords or questions.
+
+# STEPS
+
+The following rules apply:
+- Take special care not to misinterpret the data and select the data that matches the question.
+- Search for medical synonyms and abbreviations of the keywords entered.
+- If the user searches for tumor tissue, the user should not be shown data with normal tissue.
+- If the user searches for *cancer* or *tumor*, *no* data of benign tumors or normal tissue should be displayed to the user.
+- Benign tumor tissue is also referred to as non-malignant or benign tumor tissue (no indication of malignancy).
+- Malignant tumor tissue (cancer) is also referred to as malignant or neoplastic tumor tissue.
+- Normal tissue is also referred to as tumor-free tissue.
+- If the user searches for a specific organ, no primary findings of another organ should be displayed to the user.
+
+# QUESTION
+
+Find the best matching records for the following question or keywords:
+"[KEYWORDS]""
+""";
+        }
         systemPrompt = systemPrompt.Replace("\n", "\\n").Replace("'", "''");
 
-        query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('SystemPrompt', '{systemPrompt}', 'AiConfig')";
-            await ExecuteNonQuery(query);
+        query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaModel', '{modelName}', '{type}')";
+        await ExecuteNonQuery(query);
+
+        query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('SystemPrompt', '{systemPrompt}', '{type}')";
+        await ExecuteNonQuery(query);
     }
 
     /// <summary>
@@ -354,5 +532,73 @@ public class DbService : IDbService
     {
         string query = "DROP DATABASE IF EXISTS ClickSphere";
         await ExecuteNonQuery(query);
+    }
+
+    /// <summary>
+    /// Get the system configuration
+    /// </summary>
+    /// <param name="type">The type of the configuration</param>
+    /// <returns>The system configuration from the database</returns>
+    public AiConfig GetAiConfig(string type)
+    {
+        string sql = $"SELECT Key, Value FROM ClickSphere.Config WHERE Section = '{type}' order by Key";
+        var result = ExecuteQueryDictionary(sql).Result;
+
+        AiConfig config = new();
+
+        if (result.Count == 0)
+            return config;
+
+        foreach (var row in result)
+        {
+            if (row.ContainsKey("Key") && row.ContainsKey("Value"))
+            {
+                string? key = row["Key"]?.ToString();
+                string? value = row["Value"]?.ToString();
+
+                if (key == "OllamaUrl")
+                    config.OllamaUrl = value;
+                else if (key == "OllamaModel")
+                    config.OllamaModel = value;
+                else if (key == "SystemPrompt")
+                    config.SystemPrompt = value;
+            }
+        }
+        return config;
+    }
+
+    /// <summary>
+    /// Set the system configuration
+    /// </summary>
+    /// <param name="config">The system configuration to set</param>
+    /// <param name="type">The type of the configuration (RAG, Text2SQL)</param>
+    /// <returns>True if the configuration was set successfully</returns>
+    public async Task SetAiConfig(string type, AiConfig config)
+    {
+        // escape single quotes in input string
+        config.SystemPrompt = config.SystemPrompt?.Replace("'", "''");
+
+        try
+        {
+            // update ClickSphere.Config table (KEY, VALUE, SECTION)
+            string sql = $"ALTER TABLE ClickSphere.Config " +
+                         $"UPDATE Value = '{config.OllamaUrl}' " +
+                         $"WHERE Key = 'OllamaUrl' AND Section = '{type}'";
+            await ExecuteNonQuery(sql);
+
+            sql = $"ALTER TABLE ClickSphere.Config " +
+                  $"UPDATE Value = '{config.OllamaModel}' " +
+                  $"WHERE Key = 'OllamaModel' AND Section = '{type}'";
+            await ExecuteNonQuery(sql);
+
+            sql = $"ALTER TABLE ClickSphere.Config " +
+                  $"UPDATE Value = '{config.SystemPrompt}' " +
+                  $"WHERE Key = 'SystemPrompt' AND Section = '{type}'";
+            await ExecuteNonQuery(sql);
+        }
+        catch (Exception e)
+        {
+            throw new Exception($"Error updating AiConfig: {e.Message}");
+        }
     }
 }

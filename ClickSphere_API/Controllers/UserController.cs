@@ -38,6 +38,8 @@ public class UserController(IApiUserService userService) : ControllerBase
                 IsPersistent = true,
                 ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
             };
+
+            // Set the authentication cookie
             return Results.SignIn(claimsPrincipal, authProperties);
         }
         else
@@ -73,6 +75,23 @@ public class UserController(IApiUserService userService) : ControllerBase
             return Results.BadRequest("Username and password are required");
 
         Result result = await _userService.CreateUser(user.Username, user.Password);
+        if (!result.IsSuccessful)
+            return Results.BadRequest(result.Output);
+        
+        result = await _userService.UpdateUser(new UserConfig
+        {
+            Id = Guid.Parse(result.Output),
+            Username = user.Username,
+            Email = user.Email,
+            LastName = user.LastName,
+            FirstName = user.FirstName,
+            Phone = user.Phone,
+            Department = user.Department,
+            LDAP_User = user.LDAP_User,
+            Role = "User",
+            Language = user.Language
+        });
+
         if (result.IsSuccessful)
             return Results.Ok();
         else
@@ -91,6 +110,8 @@ public class UserController(IApiUserService userService) : ControllerBase
     {
         if (string.IsNullOrEmpty(username))
             return Results.BadRequest("Username is required");
+        if (username == "default")
+            return Results.BadRequest("Default user cannot be deleted!");
 
         Result result = await _userService.DeleteUser(username);
         if (result.IsSuccessful)
@@ -133,6 +154,26 @@ public class UserController(IApiUserService userService) : ControllerBase
         {
             return Results.BadRequest("User ID has to be a valid GUID");
         }
+    }
+
+    /// <summary>
+    /// Get user id from the user name.
+    /// </summary>
+    /// <param name="username">The user name of the user</param>
+    /// <returns>The user id</returns>
+    [Authorize]
+    [HttpGet]
+    [Route("/getUserId")]
+    public async Task<IResult?> GetUserId(string username)
+    {
+        if (string.IsNullOrEmpty(username))
+            return Results.BadRequest("Username is required");
+
+        var result = await _userService.GetUserId(username);
+        if (result != Guid.Empty)
+            return Results.Ok(result);
+        else
+            return Results.BadRequest("User does not exist");
     }
 
     /// <summary>

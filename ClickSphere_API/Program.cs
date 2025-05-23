@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using ClickSphere_API.Services;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,6 +51,7 @@ builder.Services.AddScoped<IApiRoleService, ApiRoleService>();
 builder.Services.AddScoped<IApiViewService, ApiViewServices>();
 builder.Services.AddScoped<ISqlParser, SqlParser>();
 builder.Services.AddScoped<IAiService, AiService>();
+builder.Services.AddScoped<IRagService, RagService>();
 
 // read token expiration from configuration
 var config = builder.Configuration.GetSection("BearerToken");
@@ -67,11 +70,19 @@ builder.Services.AddAuthentication().AddBearerToken(config =>
 });
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options => 
+{
+    options.JsonSerializerOptions.WriteIndented = false;
+});
 
 // enable compression for Kestrel
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
 builder.Services.AddResponseCompression(options =>
 {
+    options.Providers.Add<GzipCompressionProvider>();
     options.EnableForHttps = true;
 });
 
@@ -88,6 +99,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 app.UseCors();
+app.UseResponseCompression();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

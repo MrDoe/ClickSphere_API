@@ -38,10 +38,23 @@ public class View
     public string Query { get; set; }
     
     /// <summary>
+    /// Gets or sets the type of the view.
+    /// V for standard view, M for materialized view.
+    /// </summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; }
+
+    /// <summary>
     /// Gets or sets the example questions for the view.
     /// </summary>
     [JsonPropertyName("questions")]
     public string Questions { get; set; }
+
+    /// <summary>
+    /// Last synchronization with source table.
+    /// </summary>
+    [JsonPropertyName("lastSync")]
+    public DateTime LastSync { get; set; }
     
     /// <summary>
     /// Initializes a new instance of the <see cref="View"/> class.
@@ -53,5 +66,6 @@ public class View
         Database = "";
         Query = "";
         Questions = "";
+        Type = "V";
     }
 }
