@@ -37,7 +37,7 @@ public class RagController(IRagService RagService, IDbService DbService) : Contr
         if (string.IsNullOrEmpty(content))
             return false;
         else
-            await RagService.StoreRagEmbedding(doc.Id, doc.Filename, content, "", "", "", embedding[0]);
+            await RagService.StoreRagEmbedding((long)doc.Id, doc.Filename, content, "", "", "", embedding[0]);
 
         return true;
     }

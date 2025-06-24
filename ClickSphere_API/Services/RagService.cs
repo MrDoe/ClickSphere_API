@@ -1,9 +1,11 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
 using ClickSphere_API.Models.Requests;
+using Octonica.ClickHouseClient;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -11,6 +13,9 @@ namespace ClickSphere_API.Services;
 /// </summary>
 public class RagService : IRagService
 {
+
+    private const string PythonServiceUrl = "http://localhost:5555/embed"; // URL of your Python microservice
+
     /// <summary>
     /// Initializes a new instance of the <see cref="RagService"/> class.
     /// </summary>
@@ -53,7 +58,7 @@ public class RagService : IRagService
                 )
                 ENGINE = MergeTree()
                 ORDER BY Id";
-            
+
             await DbService!.ExecuteNonQuery(query);
 
             // create index on the embedding column
@@ -72,7 +77,7 @@ public class RagService : IRagService
                 Distance Float,
                 SessionId UUID NOT NULL)
                 ENGINE Memory";
-            
+
             await DbService.ExecuteNonQuery(query);
 
             return Results.Ok();
@@ -90,7 +95,7 @@ public class RagService : IRagService
     /// <param name="taskType">The task type (search_query, search_document, clustering, classification)</param>
     /// <returns>Embedding vector</returns>
     public async Task<List<List<float>>?> GenerateEmbedding(string input, string? taskType)
-    {        
+    {
         // create a new HttpClient and HttpClientHandler
         using HttpClientHandler handler = new()
         {
@@ -115,11 +120,11 @@ public class RagService : IRagService
 
         // add system prompt for search_document task
         if (taskType == "search_document")
-            input = RAGConfig.SystemPrompt + input;
-     
+            input = RAGConfig.SystemPrompt!.Replace("[KEYWORDS]", input);
+
         var request = new OllamaEmbed
         {
-            model = "bge-m3",
+            model = RAGConfig.OllamaModel!,
             input = input,
             truncate = true,
             options = requestOptions,
@@ -135,7 +140,7 @@ public class RagService : IRagService
 
         // Send POST request to the Ollama API
         HttpResponseMessage response;
-        try 
+        try
         {
             response = await client.PostAsync("api/embed", jsonContent);
         }
@@ -256,7 +261,7 @@ public class RagService : IRagService
             // insert embedding into ClickSphere.RAG table
             string sql = "INSERT INTO ClickSphere.RAG " +
                          "(Id, FilePath, FileContent, Database, TableName, ColumnName, Embedding) " +
-                         $"VALUES ({id},'{filename}','{document}','{database}','{tableName}','{columnName}'," + 
+                         $"VALUES ({id},'{filename}','{document}','{database}','{tableName}','{columnName}'," +
                          $"'[{embeddingString}]')";
 
             await DbService!.ExecuteNonQuery(sql);
@@ -276,7 +281,7 @@ public class RagService : IRagService
     /// <param name="viewName">The view to search</param>
     /// <param name="columnName">The column to search</param>
     /// <returns>Session id for search results</returns>
-    public async Task<RAGresult?> GetRagDocuments(string keyword, int distance, string database, 
+    public async Task<RAGresult?> GetRagDocuments(string keyword, int distance, string database,
                                                   string viewName, string columnName)
     {
         string sDistance = (distance / 100.0f).ToString("0.00");
@@ -299,9 +304,9 @@ public class RagService : IRagService
 
         var result = await DbService!.ExecuteQueryDictionary(sql);
 
-        if(result.Count == 0)
+        if (result.Count == 0)
             return null;
-        
+
         // create session id for retrieval of the results
         var sessionId = Guid.NewGuid();
 
@@ -333,5 +338,154 @@ public class RagService : IRagService
     {
         string sql = $"DELETE FROM ClickSphere.RAG WHERE Database = '{database}' AND TableName = '{tableName}' AND ColumnName = '{columnName}'";
         await DbService!.ExecuteNonQuery(sql);
+    }
+
+    /// <summary>
+    /// Gets embeddings for a list of sentences from the Python service.
+    /// </summary>
+    /// <param name="sentences">The list of sentences to get embeddings for.</param>
+    /// <returns>A task that represents the asynchronous operation, containing the embeddings response.</returns>
+    public static async Task<PythonEmbeddingResponse?> GetEmbeddingsFromPythonService(List<string> sentences)
+    {
+        var requestBody = new PythonEmbeddingRequest { Sentences = sentences };
+        var content = JsonContent.Create(requestBody);
+
+        // create a new HttpClient and HttpClientHandler
+        using HttpClientHandler handler = new()
+        {
+            UseProxy = false
+        };
+        using HttpClient client = new(handler)
+        {
+            BaseAddress = new Uri(PythonServiceUrl),
+            Timeout = TimeSpan.FromSeconds(60)
+        };
+
+        try
+        {
+            HttpResponseMessage response = await client.PostAsync(PythonServiceUrl, content);
+            response.EnsureSuccessStatusCode();
+            PythonEmbeddingResponse? embeddings = await response.Content.ReadFromJsonAsync<PythonEmbeddingResponse>();
+            return embeddings;
+        }
+        catch (HttpRequestException e)
+        {
+            Console.WriteLine($"Error calling Python embedding service: {e.Message}. Ensure Python service is running on {PythonServiceUrl}.");
+            return null;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"An unexpected error occurred getting Python embeddings: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Insert a list of documents into the ClickHouse database.
+    /// </summary>
+    /// <param name="documents">List of documents to insert.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    public async Task InsertDocumentsIntoClickHouse(List<Document> documents)
+    {
+        using (var connection = DbService!.CreateConnection())
+        {
+            await connection.OpenAsync();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "INSERT INTO my_documents (id, content, dense_embedding, sparse_indices, sparse_values) VALUES (@id, @content, @dense_embedding, @sparse_indices, @sparse_values)";
+                foreach (var doc in documents)
+                {
+                    cmd.Parameters.Clear();
+                    var param = new ClickHouseParameter("id", doc.Id.ToString());
+                    cmd.Parameters.Add(param);
+                    var contentParam = new ClickHouseParameter("content", doc.Content);
+                    cmd.Parameters.Add(contentParam);
+                    cmd.Parameters.Add(new ClickHouseParameter("dense_embedding", string.Join(",", doc.DenseEmbedding)));
+                    cmd.Parameters.Add(new ClickHouseParameter("sparse_indices", string.Join(",", doc.SparseIndices ?? new List<int>())));
+                    cmd.Parameters.Add(new ClickHouseParameter("sparse_values", string.Join(",", doc.SparseValues?.ToArray() ?? new float[0])));
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+    }
+
+    public async Task<List<Document>> SearchDenseInClickHouse(float[] queryDenseEmbedding, int topK)
+    {
+        List<Document> results = new List<Document>();
+        using (var connection = DbService!.CreateConnection())
+        {
+            await connection.OpenAsync();
+            using (var cmd = connection.CreateCommand())
+            {
+                // Calculating cosine similarity directly in ClickHouse SQL.
+                // For very large-scale vector search, consider specialized vector indexes
+                // if ClickHouse's capabilities or other dedicated vector DBs.
+                cmd.CommandText = $@"
+                    SELECT
+                        id,
+                        content,
+                        dense_embedding,
+                        sparse_indices,
+                        sparse_values,
+                        -- Calculate dot product
+                        arraySum(arrayMap((x, y) -> x * y, dense_embedding, @query_dense_embedding)) AS dot_product,
+                        -- Calculate magnitudes
+                        sqrt(arraySum(arrayMap((x) -> x * x, dense_embedding))) AS doc_magnitude,
+                        sqrt(arraySum(arrayMap((x) -> x * x, @query_dense_embedding))) AS query_magnitude,
+                        -- Calculate cosine similarity
+                        dot_product / (doc_magnitude * query_magnitude) AS cosine_similarity
+                    FROM my_documents
+                    ORDER BY cosine_similarity DESC
+                    LIMIT @topK
+                ";
+                cmd.Parameters.Add(new ClickHouseParameter("query_dense_embedding", queryDenseEmbedding.ToString() ?? ""));
+                cmd.Parameters.Add(new ClickHouseParameter("topK", topK.ToString() ?? ""));
+
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (reader.Read())
+                    {
+                        results.Add(new Document
+                        {
+                            Id = reader.GetUInt64(0),
+                            Content = reader.GetString(1),
+                            DenseEmbedding = (float[])reader.GetValue(2),
+                            SparseIndices = ((int[])reader.GetValue(3)).ToList(),
+                            SparseValues = ((float[])reader.GetValue(4)).ToList(),
+                            DenseScore = reader.GetDouble(8) // This is the cosine_similarity
+                        });
+                    }
+                }
+            }
+        }
+        return results;
+    }
+
+    // --- C# Hybrid Reranking Helper: Calculates Sparse Dot Product (Lexical Similarity) ---
+    public static double CalculateSparseDotProduct(
+        List<int> queryIndices, List<float> queryValues,
+        List<int> docIndices, List<float> docValues)
+    {
+        double score = 0.0;
+        // Create a dictionary for faster lookup of query sparse values by index
+        var querySparseMap = new Dictionary<int, float>();
+        for (int i = 0; i < queryIndices.Count; i++)
+        {
+            querySparseMap[queryIndices[i]] = queryValues[i];
+        }
+
+        // Iterate through document's sparse values and multiply by matching query values
+        for (int i = 0; i < docIndices.Count; i++)
+        {
+            int docIndex = docIndices[i];
+            float docValue = docValues[i];
+
+            if (querySparseMap.TryGetValue(docIndex, out float queryValue))
+            {
+                score += queryValue * docValue;
+            }
+        }
+        // Note: BGE-M3's sparse vectors are typically already weighted, so a simple dot product is often sufficient for reranking.
+        return score;
     }
 }

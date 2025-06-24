@@ -197,7 +197,27 @@ public class DbService : IDbService
         using var connection = CreateConnection();
         await connection.OpenAsync();
         var command = connection.CreateCommand(query);
-        var reader = await command.ExecuteReaderAsync();
+        ClickHouseDataReader? reader = null;
+        try
+        {
+            reader = await command.ExecuteReaderAsync();
+        }
+        catch (ClickHouseException e)
+        {
+            // if exception contains "Database ClickSphere does not exist"
+            if (e.Message.Contains("Database ClickSphere does not exist"))
+            {
+                // initialize the database
+                await InitializeDatabase();
+                // retry the command
+                reader = await command.ExecuteReaderAsync();
+            }
+            else
+            {
+                throw new Exception(e.Message);
+            }
+        }
+        
         var result = new T();
 
         if (await reader.ReadAsync())
@@ -546,7 +566,7 @@ The following rules apply:
 # QUESTION
 
 Find the best matching records for the following question or keywords:
-"[KEYWORDS]""
+"[KEYWORDS]"
 """;
         }
         systemPrompt = systemPrompt.Replace("\n", "\\n").Replace("'", "''");
