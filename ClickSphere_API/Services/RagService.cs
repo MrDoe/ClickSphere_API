@@ -114,8 +114,7 @@ public class RagService : IRagService
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            //temperature = 0.1 // keep default value
-            //num_ctx = 4096
+            num_ctx = 8192
         };
 
         // add system prompt for search_document task

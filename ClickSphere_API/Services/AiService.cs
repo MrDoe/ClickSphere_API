@@ -62,23 +62,19 @@ public partial class AiService : IAiService
 
         string systemPrompt =
 """
-Follow the instructions precisly. 
-Don't explain. 
-Output the answer only.
-Do not include any file links or URLs.
-Output plain text only without any formatting.
-Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
+Follow the instructions precisely and concisely.
+Do not output additional information, just the answer to the question as plain text.
 """;
 
         OllamaRequestOptions options = new()
         {
-            temperature = 0.1,
-            num_ctx = 2048
+            temperature = 0.1
+            //num_ctx = 2048
         };
 
         OllamaRequest request = new()
         {
-            model = "gemma2:9b-instruct-q5_K_M",
+            model = Text2SQLConfig.OllamaModel!,
             prompt = question,
             stream = false,
             system = systemPrompt,
