@@ -69,7 +69,7 @@ Do not output additional information, just the answer to the question as plain t
         OllamaRequestOptions options = new()
         {
             temperature = 0.1,
-            num_ctx = 512
+            num_ctx = 128
         };
 
         OllamaRequest request = new()
