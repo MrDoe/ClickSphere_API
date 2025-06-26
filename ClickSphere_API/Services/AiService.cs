@@ -68,8 +68,8 @@ Do not output additional information, just the answer to the question as plain t
 
         OllamaRequestOptions options = new()
         {
-            temperature = 0.1
-            //num_ctx = 2048
+            temperature = 0.1,
+            num_ctx = 512
         };
 
         OllamaRequest request = new()
@@ -78,7 +78,8 @@ Do not output additional information, just the answer to the question as plain t
             prompt = question,
             stream = false,
             system = systemPrompt,
-            options = options
+            options = options,
+            keep_alive = "-1m"
         };
 
         // Create the JSON request content.

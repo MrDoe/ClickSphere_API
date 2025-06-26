@@ -53,5 +53,5 @@ public class OllamaRequest
     /// <summary>
     /// Controls how long the model will stay loaded into memory following the request (default: 5m)
     /// </summary>
-    public int? keep_alive { get; set; } = 30;
+    public string? keep_alive { get; set; } = "-1m";
 }
