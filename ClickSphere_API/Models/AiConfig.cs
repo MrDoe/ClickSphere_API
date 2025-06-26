@@ -18,4 +18,9 @@ public class AiConfig
     /// The system prompt to use for Ollama.
     /// </summary>
     public string? SystemPrompt { get; set; }
+
+    /// <summary>
+    /// The thinking mode for reasoning models.
+    /// </summary>
+    public bool? Think { get; set; }
 }

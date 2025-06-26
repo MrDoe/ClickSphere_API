@@ -50,13 +50,15 @@ public class AiController(IAiService AiService, IDbService DbService, IRagServic
     public async Task<string> Ask([FromBody] TextRequest request)
     {
         string question = request.Text;
+        string aiConfig = request.AiConfig;
+
         if (string.IsNullOrWhiteSpace(question))
         {
             throw new ArgumentException("Question is empty");
         }
 
         // Call the Ollama API
-        string response = await AiService.Ask(question);
+        string response = await AiService.Ask(question, aiConfig);
         return response;
     }
 

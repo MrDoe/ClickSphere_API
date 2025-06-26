@@ -46,6 +46,11 @@ public class OllamaRequest
     public bool? stream { get; set; }
 
     /// <summary>
+    /// Enable/disable thinking mode for reasoning models.
+    /// </summary>
+    public bool? think { get; set; }
+
+    /// <summary>
     /// If true no formatting will be applied to the prompt. You may choose to use the raw parameter if you are specifying a full templated prompt in your request to the API
     /// </summary>
     public bool? raw { get; set; }

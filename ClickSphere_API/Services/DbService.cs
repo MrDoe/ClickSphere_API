@@ -470,12 +470,19 @@ public class DbService : IDbService
         await ExecuteNonQuery(query);
 
         // check if AI Configuration exists
-        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'RAGConfig'";
+        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'RagEmbeddingConfig'";
         result = await ExecuteScalar(query);
 
         if (result is DBNull)
         {
-            await InsertAiConfig("RAGConfig");
+            await InsertAiConfig("RagEmbeddingConfig");
+        }
+
+        query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'RagRefinementConfig'";
+        result = await ExecuteScalar(query);
+        if (result is DBNull)
+        {
+            await InsertAiConfig("RagRefinementConfig");
         }
 
         query = "SELECT Key FROM ClickSphere.Config WHERE Section = 'Text2SQLConfig'";
@@ -541,34 +548,16 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
 
 """;
         }
-        else if (type == "RAGConfig")
+        else if (type == "RagEmbeddingConfig")
         {
-            modelName = "bge-m3";
-            systemPrompt =
-"""
-# IDENTITY and PURPOSE
-
-You are a pathologist and expert for medical data, diagnoses, abbreviations and pathological findings in German and English.
-Your task is to find the best matching data sets for keywords or questions.
-
-# STEPS
-
-The following rules apply:
-- Take special care not to misinterpret the data and select the data that matches the question.
-- Search for medical synonyms and abbreviations of the keywords entered.
-- If the user searches for tumor tissue, the user should not be shown data with normal tissue.
-- If the user searches for *cancer* or *tumor*, *no* data of benign tumors or normal tissue should be displayed to the user.
-- Benign tumor tissue is also referred to as non-malignant or benign tumor tissue (no indication of malignancy).
-- Malignant tumor tissue (cancer) is also referred to as malignant or neoplastic tumor tissue.
-- Normal tissue is also referred to as tumor-free tissue.
-- If the user searches for a specific organ, no primary findings of another organ should be displayed to the user.
-
-# QUESTION
-
-Find the best matching records for the following question or keywords:
-"[KEYWORDS]"
-""";
+            modelName = "snowflake-arctic-embed2:latest";
         }
+        else if (type == "RagRefinementConfig")
+        {
+            modelName = "qwen3:1.7b";
+            systemPrompt = "Erweitere den folgenden medizinisch pathologischen Suchbegriff um eine Kurzbeschreibung, Synonyme und Abkürzungen: ";
+        }
+
         systemPrompt = systemPrompt.Replace("\n", "\\n").Replace("'", "''");
 
         query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('OllamaModel', '{modelName}', '{type}')";
@@ -615,6 +604,8 @@ Find the best matching records for the following question or keywords:
                     config.OllamaModel = value;
                 else if (key == "SystemPrompt")
                     config.SystemPrompt = value;
+                else if (key == "Think")
+                    config.Think = value?.ToLower() == "true";
             }
         }
         return config;
@@ -648,6 +639,14 @@ Find the best matching records for the following question or keywords:
                   $"UPDATE Value = '{config.SystemPrompt}' " +
                   $"WHERE Key = 'SystemPrompt' AND Section = '{type}'";
             await ExecuteNonQuery(sql);
+
+            if (config.Think.HasValue)
+            {
+                sql = $"ALTER TABLE ClickSphere.Config " +
+                      $"UPDATE Value = '{(config.Think.Value ? "true" : "false")}' " +
+                      $"WHERE Key = 'Think' AND Section = '{type}'";
+                await ExecuteNonQuery(sql);
+            }
         }
         catch (Exception e)
         {

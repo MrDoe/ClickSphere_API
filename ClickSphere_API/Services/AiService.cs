@@ -42,16 +42,19 @@ public partial class AiService : IAiService
     /// Ask a question regarding to ClickHouse databases
     /// </summary>
     /// <param name="question"></param>
+    /// <param name="aiConfig">AI configuration name, e.g. "Text2SQLConfig"</param>
     /// <returns></returns>
-    public async Task<string> Ask(string question)
+    public async Task<string> Ask(string question, string aiConfig)
     {
+        var AiConfig = DbService.GetAiConfig(aiConfig);
+
         using HttpClientHandler handler = new()
         {
             UseProxy = false
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -67,20 +70,21 @@ Do not output additional information, just the answer to the question as plain t
 
         OllamaRequestOptions options = new()
         {
-            temperature = 0.0,
-            num_ctx = 256,
+            temperature = 0,
+            num_ctx = 512,
             num_keep = 0,
-            num_predict = 128,
+            //num_predict = 256,
             repeat_last_n = 0
         };
 
         OllamaRequest request = new()
         {
-            model = Text2SQLConfig.OllamaModel!,
+            model = AiConfig.OllamaModel!,
             prompt = question,
             stream = false,
-            system = systemPrompt,
+            system = AiConfig.SystemPrompt ?? systemPrompt,
             options = options,
+            think = AiConfig.Think ?? false,
             keep_alive = "-1m"
         };
 
@@ -91,7 +95,7 @@ Do not output additional information, just the answer to the question as plain t
             mediaType);
 
         // Send a POST request to the Ollama API
-        HttpResponseMessage response = await client.PostAsync(OllamaApiPath, jsonContent);
+        HttpResponseMessage response = await client.PostAsync(AiConfig.OllamaUrl + "/api/generate", jsonContent);
 
         if (response.IsSuccessStatusCode)
         {

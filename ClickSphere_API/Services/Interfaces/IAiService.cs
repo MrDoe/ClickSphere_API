@@ -10,8 +10,9 @@ public interface IAiService
     /// Asks a question to the AI service and returns the response.
     /// </summary>
     /// <param name="question">The question to ask.</param>
+    /// <param name="aiConfig">AI configuration name, e.g. "Text2SQLConfig"</param>
     /// <returns>The response from the AI service.</returns>
-    Task<string> Ask(string question);
+    Task<string> Ask(string question, string aiConfig);
 
     /// <summary>
     /// Generates a query based on the question, database, and table provided.

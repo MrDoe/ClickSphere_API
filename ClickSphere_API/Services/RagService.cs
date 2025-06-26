@@ -115,10 +115,6 @@ public class RagService : IRagService
             num_ctx = 8192
         };
 
-        // add system prompt for search_document task
-        if (taskType == "search_document")
-            input = RAGConfig.SystemPrompt!.Replace("[KEYWORDS]", input);
-
         var request = new OllamaEmbed
         {
             model = RAGConfig.OllamaModel!,
