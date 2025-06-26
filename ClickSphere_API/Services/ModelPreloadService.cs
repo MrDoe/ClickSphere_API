@@ -101,7 +101,8 @@ public class ModelPreloadService : IHostedService
         // Create the request object
         OllamaRequest request = new()
         {
-            model = model
+            model = model,
+            keep_alive = "-1m"
         };
         
         // Create the JSON request content
