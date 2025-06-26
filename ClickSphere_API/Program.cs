@@ -45,13 +45,14 @@ builder.Services.AddSwaggerGen(c =>
 
 // custom services
 builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
-builder.Services.AddScoped<IDbService, DbService>();
+builder.Services.AddSingleton<IDbService, DbService>();
 builder.Services.AddScoped<IApiUserService, ApiUserService>();
 builder.Services.AddScoped<IApiRoleService, ApiRoleService>();
 builder.Services.AddScoped<IApiViewService, ApiViewServices>();
 builder.Services.AddScoped<ISqlParser, SqlParser>();
 builder.Services.AddScoped<IAiService, AiService>();
 builder.Services.AddScoped<IRagService, RagService>();
+builder.Services.AddHostedService<ModelPreloadService>();
 
 // read token expiration from configuration
 var config = builder.Configuration.GetSection("BearerToken");

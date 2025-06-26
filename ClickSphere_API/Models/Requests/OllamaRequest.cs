@@ -13,7 +13,7 @@ public class OllamaRequest
     /// <summary>
     /// Gets or sets the prompt to generate the response for.
     /// </summary>
-    public required string prompt { get; set; }
+    public string? prompt { get; set; }
 
     /// <summary>
     /// The format to return a response in. Currently the only accepted value is json.
@@ -43,7 +43,7 @@ public class OllamaRequest
     /// <summary>
     /// If false the response will be returned as a single response object, rather than a stream of objects.
     /// </summary>
-    public bool? stream { get; set; } = false;
+    public bool? stream { get; set; }
 
     /// <summary>
     /// If true no formatting will be applied to the prompt. You may choose to use the raw parameter if you are specifying a full templated prompt in your request to the API
@@ -53,5 +53,5 @@ public class OllamaRequest
     /// <summary>
     /// Controls how long the model will stay loaded into memory following the request (default: 5m)
     /// </summary>
-    public string? keep_alive { get; set; } = "-1m";
+    public string? keep_alive { get; set; }
 }

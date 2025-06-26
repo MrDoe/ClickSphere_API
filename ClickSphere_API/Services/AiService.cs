@@ -56,7 +56,6 @@ public partial class AiService : IAiService
         };
 
         // Add an Accept header for JSON format.
-        client.DefaultRequestHeaders.Accept.Clear();
         var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
         client.DefaultRequestHeaders.Accept.Add(mediaType);
 

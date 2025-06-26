@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -13,7 +12,6 @@ namespace ClickSphere_API.Services;
 /// </summary>
 public class RagService : IRagService
 {
-
     private const string PythonServiceUrl = "http://localhost:5555/embed"; // URL of your Python microservice
 
     /// <summary>
@@ -34,7 +32,7 @@ public class RagService : IRagService
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
     /// <summary>
