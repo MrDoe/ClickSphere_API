@@ -556,6 +556,10 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
         {
             modelName = "qwen3:1.7b";
             systemPrompt = "Erweitere den folgenden medizinisch pathologischen Suchbegriff um eine Kurzbeschreibung, Synonyme und Abkürzungen: ";
+
+            // add auto refine option
+            query = $"INSERT INTO ClickSphere.Config (Key, Value, Section) VALUES ('AutoRefine', 'true', '{type}')";
+            await ExecuteNonQuery(query);
         }
 
         systemPrompt = systemPrompt.Replace("\n", "\\n").Replace("'", "''");
@@ -606,6 +610,8 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
                     config.SystemPrompt = value;
                 else if (key == "Think")
                     config.Think = value?.ToLower() == "true";
+                else if (key == "AutoRefine")
+                    config.AutoRefine = value?.ToLower() == "true";
             }
         }
         return config;
@@ -645,6 +651,13 @@ Use ClickHouse SQL references, tutorials, and documentation to generate valid Cl
                 sql = $"ALTER TABLE ClickSphere.Config " +
                       $"UPDATE Value = '{(config.Think.Value ? "true" : "false")}' " +
                       $"WHERE Key = 'Think' AND Section = '{type}'";
+                await ExecuteNonQuery(sql);
+            }
+            if (type == "RagRefinementConfig")
+            {
+                sql = $"ALTER TABLE ClickSphere.Config " +
+                      $"UPDATE Value = '{(config.AutoRefine ? "true" : "false")}' " +
+                      $"WHERE Key = 'AutoRefine' AND Section = '{type}'";
                 await ExecuteNonQuery(sql);
             }
         }

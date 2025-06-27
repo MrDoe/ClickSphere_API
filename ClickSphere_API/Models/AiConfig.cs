@@ -23,4 +23,9 @@ public class AiConfig
     /// The thinking mode for reasoning models.
     /// </summary>
     public bool? Think { get; set; }
+
+    /// <summary>
+    /// Auto refine input for the AI search.
+    /// </summary>
+    public bool AutoRefine { get; set; } = false;
 }
