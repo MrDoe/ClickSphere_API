@@ -5,157 +5,184 @@ namespace ClickSphere_API.Models.Requests;
 public class OllamaRequestOptions
 {
     /// <summary>
-    /// The number of generated responses to keep.
+    /// The number of generated responses to keep. Must be at least 1.
+    /// Range: [1, ∞)
     /// </summary>
     public int? num_keep { get; set; }
 
     /// <summary>
-    /// The random seed used for generation. Using the same seed will result in the same output for the same input.
+    /// The random seed used for generation. Using the same seed and input yields the same output.
+    /// Range: [0, 2^32−1]
     /// </summary>
     public int? seed { get; set; }
 
     /// <summary>
-    /// The number of tokens to generate.
+    /// The number of tokens to generate in the response.
+    /// Range: [1, ∞)
     /// </summary>
     public int? num_predict { get; set; }
 
     /// <summary>
-    /// These parameters control the randomness of the generation. top_k limits the model to consider only the top k most likely next tokens.
+    /// Limits sampling to the top K most probable next tokens.
+    /// Range: [0, ∞) (0 disables top-k filtering, i.e. no limit)
     /// </summary>
     public int? top_k { get; set; }
 
     /// <summary>
-    /// These parameters control the randomness of the generation. top_p makes the model consider just enough of the most likely next tokens that their cumulative probability exceeds p.
+    /// Nucleus sampling threshold: consider the smallest set of tokens whose cumulative probability ≥ top_p.
+    /// Range: [0.0, 1.0]
     /// </summary>
     public double? top_p { get; set; }
 
     /// <summary>
-    /// The tfs z value. Controls the randomness of the generation.
+    /// Tail free sampling parameter. Controls how aggressively low-probability tails are pruned.
+    /// Range: [0.0, 1.0]
     /// </summary>
     public double? tfs_z { get; set; }
 
     /// <summary>
-    /// The typical p value. Controls the randomness of the generation.
+    /// Typical sampling threshold. Filters tokens whose probability is below the typical_p-quantile of the distribution.
+    /// Range: [0.0, 1.0]
     /// </summary>
     public double? typical_p { get; set; }
 
     /// <summary>
-    /// The number of items to repeat last.
+    /// Number of last tokens to apply repetition penalty to.
+    /// Range: [0, ∞) (0 disables repetition penalty)
     /// </summary>
     public int? repeat_last_n { get; set; }
 
     /// <summary>
-    /// The temperature value. Controls the randomness of the generation.
+    /// Sampling temperature. Higher values produce more random outputs; lower values make output more deterministic.
+    /// Range: (0.0, ∞)
+    /// Typical: [0.1, 2.0]
     /// </summary>
     public double? temperature { get; set; }
 
     /// <summary>
-    /// The repeat penalty value. Controls the model’s tendency to repeat itself.
+    /// Penalty applied to tokens that have already appeared to discourage repetition.
+    /// Range: (0.0, ∞)
+    /// Typical: [1.0, 2.0]
     /// </summary>
     public double? repeat_penalty { get; set; }
 
     /// <summary>
-    /// The presence penalty value. Controls the model’s tendency to repeat itself.
+    /// Penalty for introducing new tokens not seen in the context.
+    /// Positive values discourage new tokens; negative values encourage them.
+    /// Range: [-2.0, 2.0]
     /// </summary>
     public double? presence_penalty { get; set; }
 
     /// <summary>
-    /// The frequency penalty value. Controls the model’s tendency to repeat itself.
+    /// Penalty for repeated tokens based on their existing frequency in the context.
+    /// Positive values penalize frequent tokens more heavily.
+    /// Range: [-2.0, 2.0]
     /// </summary>
     public double? frequency_penalty { get; set; }
 
     /// <summary>
-    /// The mirostat value. These parameter is related to a feature called Mirostat, which controls the model’s tendency to repeat itself.
+    /// The Mirostat algorithm version to use. 0 disables Mirostat; 1 or 2 select Mirostat 1.0 or 2.0 respectively.
+    /// Range: [0, 2]
     /// </summary>
     public int? mirostat { get; set; }
 
     /// <summary>
-    /// The mirostat tau value. These parameter is related to a feature called Mirostat, which controls the model’s tendency to repeat itself.
+    /// Target entropy (perplexity) for Mirostat. Lower values yield more focused output; higher values increase diversity.
+    /// Range: (0.0, ∞)
     /// </summary>
     public double? mirostat_tau { get; set; }
 
     /// <summary>
-    /// The mirostat eta value. These parameter is related to a feature called Mirostat, which controls the model’s tendency to repeat itself.
+    /// Learning rate for the Mirostat algorithm. Controls how quickly the model adjusts to reach the target entropy.
+    /// Range: (0.0, 1.0]
     /// </summary>
     public double? mirostat_eta { get; set; }
 
     /// <summary>
-    /// If true, the model is discouraged from generating newlines.
+    /// If true, discourages the model from emitting newline characters.
     /// </summary>
     public bool? penalize_newline { get; set; }
 
     /// <summary>
-    /// The model will stop generating when it produces one of these strings.
+    /// List of stop sequences. Generation halts when any of these strings is produced.
     /// </summary>
     public string[]? stop { get; set; }
 
     /// <summary>
-    /// This option is related to the use of Non-Uniform Memory Access (NUMA) nodes. If true, the model will be placed on the NUMA node closest to the GPU it’s using.
+    /// If true, places the model on the NUMA node closest to the GPU in use.
     /// </summary>
     public bool? numa { get; set; }
 
     /// <summary>
-    /// Number of tokens of context to use. The model will use the last num_ctx tokens as context.
+    /// Maximum number of context tokens to keep. The model uses the last num_ctx tokens as context.
+    /// Range: [1, ∞)
     /// </summary>
     public int? num_ctx { get; set; }
 
     /// <summary>
-    /// Batch size. The number of tokens to generate in parallel.
+    /// Batch size for parallel token generation.
+    /// Range: [1, ∞)
     /// </summary>
     public int? num_batch { get; set; }
 
     /// <summary>
-    /// The number of GQAs to use. GQA stands for “Generative Query Answering”.
+    /// Number of GQA (grouped query attention) units to use.
+    /// Range: [1, ∞)
     /// </summary>
     public int? num_gqa { get; set; }
 
     /// <summary>
-    /// The number of GPUs to use.
+    /// Number of GPUs to utilize for inference.
+    /// Range: [1, ∞)
     /// </summary>
     public int? num_gpu { get; set; }
 
     /// <summary>
-    /// The main GPU value. Determines which GPU to use as the main GPU.
+    /// Index of the primary GPU to use (0-based).
+    /// Range: [0, ∞)
     /// </summary>
     public int? main_gpu { get; set; }
 
     /// <summary>
-    /// The low VRAM value. If true, the model will use less VRAM.
+    /// If true, enables low-VRAM mode to reduce memory footprint.
     /// </summary>
     public bool? low_vram { get; set; }
 
     /// <summary>
-    /// The f16 KV value. If true, the model will use 16-bit floating point numbers.
+    /// If true, uses 16-bit floating point (fp16) for key/value caches.
     /// </summary>
     public bool? f16_kv { get; set; }
 
     /// <summary>
-    /// The vocab only value. If true, the model will only use the vocabulary.
+    /// If true, loads only the vocabulary (no model weights).
     /// </summary>
     public bool? vocab_only { get; set; }
 
     /// <summary>
-    /// The use mmap value. If true, the model will use memory-mapped files.
+    /// If true, uses memory-mapped files (mmap) for model weights.
     /// </summary>
     public bool? use_mmap { get; set; }
 
     /// <summary>
-    /// The use mlock value. If true, the model will lock its memory in RAM.
+    /// If true, locks model memory into RAM (mlock).
     /// </summary>
     public bool? use_mlock { get; set; }
 
     /// <summary>
-    /// The rope frequency base value. These options are related to a feature called ROPE, which adjusts the model’s behavior based on the frequency of the current token.
+    /// Base frequency parameter for ROPE (rotary positional embeddings).
+    /// Range: [0.0, ∞)
     /// </summary>
     public double? rope_frequency_base { get; set; }
 
     /// <summary>
-    /// The rope frequency scale value. These options are related to a feature called ROPE, which adjusts the model’s behavior based on the frequency of the current token.
+    /// Scale factor for ROPE frequency adjustments.
+    /// Range: [0.0, ∞)
     /// </summary>
     public double? rope_frequency_scale { get; set; }
 
     /// <summary>
-    /// The number of threads to use for generation.
+    /// Number of CPU threads to use for generation.
+    /// Range: [1, ∞)
     /// </summary>
     public int? num_thread { get; set; }
 }

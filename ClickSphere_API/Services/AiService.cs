@@ -70,11 +70,15 @@ Do not output additional information, just the answer to the question as plain t
 
         OllamaRequestOptions options = new()
         {
+            seed = 42,
             temperature = 0,
             num_ctx = 512,
             num_keep = 0,
             //num_predict = 256,
-            repeat_last_n = 0
+            repeat_last_n = 0,
+            repeat_penalty = 0,
+            presence_penalty = -1.0,
+            frequency_penalty = 2.0
         };
 
         OllamaRequest request = new()
