@@ -49,11 +49,11 @@ public class RagController(IRagService RagService, IDbService DbService) : Contr
     /// <returns>True if the embedding was stored successfully.</returns>
     [Route("/storeViewColumnEmbedding")]
     [HttpPost]
-    public async Task<bool> StoreViewColumnEmbedding(StoreViewColumnRequest request)
+    public async Task<IActionResult> StoreViewColumnEmbedding(StoreViewColumnRequest request)
     {
         if(string.IsNullOrEmpty(request.tableName) || string.IsNullOrEmpty(request.dataColumn) || 
            string.IsNullOrEmpty(request.database))
-            return false;
+            return BadRequest("Table name, data column, and database cannot be null or empty.");
 
         // delete existing embeddings
         await RagService.DeleteRagEmbeddings(request.database, request.tableName, request.dataColumn);
@@ -63,15 +63,18 @@ public class RagController(IRagService RagService, IDbService DbService) : Contr
             $"SELECT * FROM {request.database}.{request.tableName}");
       
         if (dataset == null || dataset.Count == 0)
-            return false;
+            return BadRequest("No data found in the dataset.");
         
         // Generate embedding for each dataset of the column data
         for(int i=0; i<dataset.Count; ++i)
         {
             var row = dataset[i];
 
-            if (!row.ContainsKey(request.dataColumn) || !row.ContainsKey(request.keyColumn))
-                return false;
+            if (!row.ContainsKey(request.dataColumn))
+                return BadRequest($"Column {request.dataColumn} not found in dataset.");
+
+            if (!row.ContainsKey(request.keyColumn))
+                return BadRequest($"Key column {request.keyColumn} not found in dataset.");
             
             string? columnData = row[request.dataColumn].ToString();
             
@@ -80,7 +83,7 @@ public class RagController(IRagService RagService, IDbService DbService) : Contr
             
             var embedding = await RagService.GenerateEmbedding(columnData, "");
             if (embedding == null)
-                return false;
+                return BadRequest($"Failed to generate embedding for row {i}.");
 
             // get id from key column
             long id;
@@ -90,12 +93,12 @@ public class RagController(IRagService RagService, IDbService DbService) : Contr
             }
             catch
             {
-                return false;
+                return BadRequest($"Failed to convert key column {request.keyColumn} to long for row {i}.");
             }
             await RagService.StoreRagEmbedding(id, "", columnData, request.database, request.tableName, 
                                                request.dataColumn, embedding[0]);
         }
-        return true;
+        return Ok();
     }
 
     /// <summary>
