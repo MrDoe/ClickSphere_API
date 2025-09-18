@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClickSphere_API.Models;
 using ClickSphere_API.Models.Requests;
+using Octonica.ClickHouseClient;
 namespace ClickSphere_API.Services;
 
 /// <summary>
@@ -29,7 +30,7 @@ public class RagService : IRagService
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
     /// <summary>
@@ -53,7 +54,7 @@ public class RagService : IRagService
                 )
                 ENGINE = MergeTree()
                 ORDER BY Id";
-            
+
             await DbService!.ExecuteNonQuery(query);
 
             // create index on the embedding column
@@ -72,7 +73,7 @@ public class RagService : IRagService
                 Distance Float,
                 SessionId UUID NOT NULL)
                 ENGINE Memory";
-            
+
             await DbService.ExecuteNonQuery(query);
 
             return Results.Ok();
@@ -90,7 +91,7 @@ public class RagService : IRagService
     /// <param name="taskType">The task type (search_query, search_document, clustering, classification)</param>
     /// <returns>Embedding vector</returns>
     public async Task<List<List<float>>?> GenerateEmbedding(string input, string? taskType)
-    {        
+    {
         // create a new HttpClient and HttpClientHandler
         using HttpClientHandler handler = new()
         {
@@ -109,17 +110,12 @@ public class RagService : IRagService
         // Create the JSON string for the request
         var requestOptions = new OllamaRequestOptions
         {
-            //temperature = 0.1 // keep default value
-            //num_ctx = 4096
+            num_ctx = 8192
         };
 
-        // add system prompt for search_document task
-        if (taskType == "search_document")
-            input = RAGConfig.SystemPrompt + input;
-     
         var request = new OllamaEmbed
         {
-            model = "bge-m3",
+            model = RAGConfig.OllamaModel!,
             input = input,
             truncate = true,
             options = requestOptions,
@@ -135,7 +131,7 @@ public class RagService : IRagService
 
         // Send POST request to the Ollama API
         HttpResponseMessage response;
-        try 
+        try
         {
             response = await client.PostAsync("api/embed", jsonContent);
         }
@@ -256,7 +252,7 @@ public class RagService : IRagService
             // insert embedding into ClickSphere.RAG table
             string sql = "INSERT INTO ClickSphere.RAG " +
                          "(Id, FilePath, FileContent, Database, TableName, ColumnName, Embedding) " +
-                         $"VALUES ({id},'{filename}','{document}','{database}','{tableName}','{columnName}'," + 
+                         $"VALUES ({id},'{filename}','{document}','{database}','{tableName}','{columnName}'," +
                          $"'[{embeddingString}]')";
 
             await DbService!.ExecuteNonQuery(sql);
@@ -276,7 +272,7 @@ public class RagService : IRagService
     /// <param name="viewName">The view to search</param>
     /// <param name="columnName">The column to search</param>
     /// <returns>Session id for search results</returns>
-    public async Task<RAGresult?> GetRagDocuments(string keyword, int distance, string database, 
+    public async Task<RAGresult?> GetRagDocuments(string keyword, int distance, string database,
                                                   string viewName, string columnName)
     {
         string sDistance = (distance / 100.0f).ToString("0.00");
@@ -299,9 +295,9 @@ public class RagService : IRagService
 
         var result = await DbService!.ExecuteQueryDictionary(sql);
 
-        if(result.Count == 0)
+        if (result.Count == 0)
             return null;
-        
+
         // create session id for retrieval of the results
         var sessionId = Guid.NewGuid();
 

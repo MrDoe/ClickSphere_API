@@ -25,8 +25,18 @@ namespace ClickSphere_API.Controllers
             // Decode base64
             string query = Encoding.UTF8.GetString(Convert.FromBase64String(b64Query));
 
-            // replace select statement by select count(*)
-            query = Regex.Replace(query, @"SELECT\s+.*?\s+FROM", "SELECT COUNT(*) FROM", RegexOptions.IgnoreCase);
+            // replace SELECT statement until FROM by 'SELECT COUNT(*)' (case sensitive)
+            query = Regex.Replace(query, @"^SELECT.*FROM", "SELECT COUNT(*) FROM", RegexOptions.Singleline);
+
+            // remove any GROUP BY clause including aliases and fields
+            query = Regex.Replace(query, @"GROUP\s+BY\s+.*\n", "", RegexOptions.IgnoreCase);
+
+            // remove any LIMIT clause
+            query = Regex.Replace(query, @"LIMIT\s+.*?(\s|$)", "", RegexOptions.IgnoreCase);
+
+            // remove any ORDER BY clause with ASC or DESC
+            query = Regex.Replace(query, @"ORDER\s+BY\s+.*?ASC(\s|$)", "", RegexOptions.IgnoreCase);
+            query = Regex.Replace(query, @"ORDER\s+BY\s+.*?DESC(\s|$)", "", RegexOptions.IgnoreCase);
 
             // Validate query
             var parsedQuery = sqlParser.Parse(query);

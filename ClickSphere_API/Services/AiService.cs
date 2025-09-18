@@ -42,47 +42,54 @@ public partial class AiService : IAiService
     /// Ask a question regarding to ClickHouse databases
     /// </summary>
     /// <param name="question"></param>
+    /// <param name="aiConfig">AI configuration name, e.g. "Text2SQLConfig"</param>
     /// <returns></returns>
-    public async Task<string> Ask(string question)
+    public async Task<string> Ask(string question, string aiConfig)
     {
+        var AiConfig = DbService.GetAiConfig(aiConfig);
+
         using HttpClientHandler handler = new()
         {
             UseProxy = false
         };
         using HttpClient client = new(handler)
         {
-            BaseAddress = new Uri(Text2SQLConfig.OllamaUrl!),
+            BaseAddress = new Uri(AiConfig.OllamaUrl!),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
         // Add an Accept header for JSON format.
-        client.DefaultRequestHeaders.Accept.Clear();
         var mediaType = new MediaTypeWithQualityHeaderValue("application/json");
         client.DefaultRequestHeaders.Accept.Add(mediaType);
 
         string systemPrompt =
 """
-Follow the instructions precisly. 
-Don't explain. 
-Output the answer only.
-Do not include any file links or URLs.
-Output plain text only without any formatting.
-Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
+Follow the instructions precisely and concisely.
+Do not output additional information, just the answer to the question as plain text.
 """;
 
         OllamaRequestOptions options = new()
         {
-            temperature = 0.1,
-            num_ctx = 2048
+            seed = 42,
+            temperature = 0,
+            num_ctx = 512,
+            num_keep = 0,
+            //num_predict = 256,
+            repeat_last_n = 0,
+            repeat_penalty = 0,
+            presence_penalty = -1.0,
+            frequency_penalty = 2.0
         };
 
         OllamaRequest request = new()
         {
-            model = "gemma2:9b-instruct-q5_K_M",
+            model = AiConfig.OllamaModel!,
             prompt = question,
             stream = false,
-            system = systemPrompt,
-            options = options
+            system = AiConfig.SystemPrompt ?? systemPrompt,
+            options = options,
+            think = AiConfig.Think ?? false,
+            keep_alive = "-1m"
         };
 
         // Create the JSON request content.
@@ -92,7 +99,7 @@ Example output: 'L2Distance(vector1: Tuple or Array, vector2: Tuple or Array)'
             mediaType);
 
         // Send a POST request to the Ollama API
-        HttpResponseMessage response = await client.PostAsync(OllamaApiPath, jsonContent);
+        HttpResponseMessage response = await client.PostAsync(AiConfig.OllamaUrl + "/api/generate", jsonContent);
 
         if (response.IsSuccessStatusCode)
         {
