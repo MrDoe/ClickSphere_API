@@ -19,7 +19,7 @@ public class RagService : IRagService
     public RagService(IDbService dbService)
     {
         DbService = dbService;
-        RAGConfig = dbService.GetAiConfig("RAGConfig");
+        RAGConfig = dbService.GetAiConfig("RagEmbeddingConfig");
         CreateRAGTable().Wait();
     }
 

@@ -30,7 +30,7 @@ public class ModelPreloadService : IHostedService
     {
         DbService = dbService;
         Text2SQLConfig = DbService.GetAiConfig("Text2SQLConfig");
-        RAGConfig = DbService.GetAiConfig("RAGConfig");
+        RAGConfig = DbService.GetAiConfig("RagEmbeddingConfig");
     }
 
     /// <summary>
